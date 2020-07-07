@@ -1,0 +1,104 @@
+version: '3.5'
+
+services:
+
+  rabbitmq:
+    image: rabbitmq:3.8.4-management
+    container_name: rabbitmq
+    restart: always
+    ports:
+      - 5672:5672
+      - 15672:15672
+    env_file:
+      - rabbitmq.env
+    networks:
+     - rabbit_network
+
+  simulation_manager:
+    build:
+      context: .
+      dockerfile: Dockerfile-manager
+    image: simulation_manager:0.1
+    container_name: simulation_manager
+    depends_on:
+      - rabbitmq
+    restart: "no"
+    env_file:
+      - common.env
+      - simulation_manager.env
+    networks:
+     - rabbit_network
+
+  dummy_component_1:
+    build:
+      context: .
+      dockerfile: Dockerfile-dummy
+    image: dummy:0.1
+    container_name: dummy_component_1
+    depends_on:
+      - rabbitmq
+    restart: "no"
+    env_file:
+      - common.env
+      - dummy.env
+    environment:
+      - SIMULATION_COMPONENT_NAME=dummy_component_1
+    networks:
+     - rabbit_network
+
+  dummy_component_2:
+    build:
+      context: .
+      dockerfile: Dockerfile-dummy
+    image: dummy:0.1
+    container_name: dummy_component_2
+    depends_on:
+      - rabbitmq
+    restart: "no"
+    env_file:
+      - common.env
+      - dummy.env
+    environment:
+      - SIMULATION_COMPONENT_NAME=dummy_component_2
+    networks:
+     - rabbit_network
+
+  dummy_component_3:
+    build:
+      context: .
+      dockerfile: Dockerfile-dummy
+    image: dummy:0.1
+    container_name: dummy_component_3
+    depends_on:
+      - rabbitmq
+    restart: "no"
+    env_file:
+      - common.env
+      - dummy.env
+    environment:
+      - SIMULATION_COMPONENT_NAME=dummy_component_3
+    networks:
+     - rabbit_network
+
+  omega:
+    build:
+      context: .
+      dockerfile: Dockerfile-omega
+    image: omega:0.1
+    container_name: omega
+    depends_on:
+      - rabbitmq
+      - simulation_manager
+      - dummy_component_1
+      - dummy_component_2
+      - dummy_component_3
+    restart: "no"
+    env_file:
+      - common.env
+      - omega.env
+    networks:
+     - rabbit_network
+
+networks:
+  rabbit_network:
+    name: rabbit_network
