@@ -13,5 +13,5 @@ docker-compose -f docker-compose-test-simulation.yml up --build --detach
 ## Run unit tests
 
 ```bash
-docker-compose -f docker-tests/docker-compose-tests.yml up --build
+docker-compose -f docker_tests/docker-compose-tests.yml up --build
 ```
