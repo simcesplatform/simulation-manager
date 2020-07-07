@@ -1,0 +1,17 @@
+version: '3.5'
+
+services:
+
+  simulation_manager_tests:
+    build:
+      context: ..
+      dockerfile: Dockerfile-tests
+    image: simulation_manager_tests:0.1
+    container_name: simulation_manager_tests
+    restart: "no"
+    networks:
+     - test_network
+
+networks:
+  test_network:
+    name: test_network
