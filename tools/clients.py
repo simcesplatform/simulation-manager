@@ -8,6 +8,7 @@ import threading
 
 import aio_pika
 
+from tools.messages import AbstractMessage
 from tools.tools import get_logger, load_environmental_variables
 
 FILE_LOGGER = get_logger(__name__)
@@ -131,6 +132,8 @@ class RabbitmqClient:
 
                 if len(message_item) == 2:
                     topic_name, message = message_item[0], message_item[1]
+                    if isinstance(message, AbstractMessage):
+                        message = message.bytes()
                     await rabbitmq_exchange.publish(aio_pika.Message(message), routing_key=topic_name)
 
                     FILE_LOGGER.debug("Message '{:s}' send to topic: '{:s}'".format(
