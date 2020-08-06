@@ -6,6 +6,10 @@ import datetime
 import logging
 import os
 
+SIMULATION_LOG_LEVEL = "SIMULATION_LOG_LEVEL"
+SIMULATION_LOG_FILE = "SIMULATION_LOG_FILE"
+SIMULATION_LOG_FORMAT = "SIMULATION_LOG_FORMAT"
+
 
 class EnvironmentVariable:
     """Class for accessing and holding environment information."""
@@ -80,7 +84,7 @@ class EnvironmentVariables:
            The value for each parameter is only fetched from the environment at the first call."""
         if variable_name in self.__variables:
             return self.__variables[variable_name].value
-        FILE_LOGGER.info("Environment variable %s not registered.", variable_name)
+        LOGGER.info("Environment variable %s not registered.", variable_name)
         return None
 
 
@@ -94,9 +98,9 @@ def load_environmental_variables(*env_variable_specifications):
 
 
 COMMON_ENV_VARIABLES = load_environmental_variables(
-    ("SIMULATION_LOG_LEVEL", int, logging.DEBUG),
-    ("SIMULATION_LOG_FILE", str, "logfile.log"),
-    ("SIMULATION_LOG_FORMAT", str, " --- ".join([
+    (SIMULATION_LOG_LEVEL, int, logging.DEBUG),
+    (SIMULATION_LOG_FILE, str, "logfile.log"),
+    (SIMULATION_LOG_FORMAT, str, " --- ".join([
         "%(asctime)s",
         "%(levelname)s",
         "%(name)s",
@@ -105,16 +109,50 @@ COMMON_ENV_VARIABLES = load_environmental_variables(
     )
 )
 
+
+class FullLogger:
+    """Logger object that also prints all the output."""
+    MESSAGE_LEVEL = {
+        logging.DEBUG: "DEBUG",
+        logging.INFO: "INFO",
+        logging.WARNING: "WARNING",
+        logging.ERROR: "ERROR"
+    }
+
+    def __init__(self, logger_name):
+        self.__logger = get_logger(logger_name)
+        self.__log_level = COMMON_ENV_VARIABLES[SIMULATION_LOG_LEVEL]
+
+    def debug(self, message, *args):
+        self.__logger.debug(message, *args)
+        self.__print(logging.DEBUG, message, *args)
+
+    def info(self, message, *args):
+        self.__logger.info(message, *args)
+        self.__print(logging.INFO, message, *args)
+
+    def warning(self, message, *args):
+        self.__logger.warning(message, *args)
+        self.__print(logging.WARNING, message, *args)
+
+    def error(self, message, *args):
+        self.__logger.error(message, *args)
+        self.__print(logging.ERROR, message, *args)
+
+    def __print(self, message_level, message, *args):
+        if self.__log_level <= message_level:
+            print(FullLogger.MESSAGE_LEVEL[message_level], ":", message % args, flush=True)
+
 def get_logger(logger_name):
     """Returns a logger object."""
     new_logger = logging.getLogger(logger_name)
-    new_logger.setLevel(COMMON_ENV_VARIABLES["SIMULATION_LOG_LEVEL"])
+    new_logger.setLevel(COMMON_ENV_VARIABLES[SIMULATION_LOG_LEVEL])
 
-    log_file_handler = logging.FileHandler(COMMON_ENV_VARIABLES["SIMULATION_LOG_FILE"])
-    log_file_handler.setFormatter(logging.Formatter(COMMON_ENV_VARIABLES["SIMULATION_LOG_FORMAT"]))
+    log_file_handler = logging.FileHandler(COMMON_ENV_VARIABLES[SIMULATION_LOG_FILE])
+    log_file_handler.setFormatter(logging.Formatter(COMMON_ENV_VARIABLES[SIMULATION_LOG_FORMAT]))
     new_logger.addHandler(log_file_handler)
 
     return new_logger
 
 
-FILE_LOGGER = get_logger(__name__)
+LOGGER = FullLogger(__name__)

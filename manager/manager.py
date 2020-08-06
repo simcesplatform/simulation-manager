@@ -2,60 +2,35 @@
 
 """This module for Simulation Manager."""
 
+import datetime
 import queue
 import threading
 import time
 
 from tools.callbacks import StatusMessageCallback
 from tools.clients import RabbitmqClient
-from tools.messages import get_next_message_id, StatusMessage, SimulationStateMessage
-from tools.tools import get_logger, load_environmental_variables
+from tools.components import SimulationComponents
+from tools.datetime_tools import to_utc_datetime_object
+from tools.messages import EpochMessage, StatusMessage, SimulationStateMessage, get_next_message_id
+from tools.tools import FullLogger, load_environmental_variables
 
-FILE_LOGGER = get_logger(__name__)
+LOGGER = FullLogger(__name__)
 
-TIMEOUT_INTERVAL = 300
+TIMEOUT_INTERVAL = 120
 
 __SIMULATION_ID = "SIMULATION_ID"
 __SIMULATION_MANAGER_NAME = "SIMULATION_MANAGER_NAME"
 __SIMULATION_OMEGA_NAME = "SIMULATION_OMEGA_NAME"
+
+__SIMULATION_EPOCH_MESSAGE_TOPIC = "SIMULATION_EPOCH_MESSAGE_TOPIC"
 __SIMULATION_STATUS_MESSAGE_TOPIC = "SIMULATION_STATUS_MESSAGE_TOPIC"
 __SIMULATION_STATE_MESSAGE_TOPIC = "SIMULATION_STATE_MESSAGE_TOPIC"
+
+__SIMULATION_COMPONENTS = "SIMULATION_COMPONENTS"
+
+__SIMULATION_INITIAL_START_TIME = "SIMULATION_INITIAL_START_TIME"
+__SIMULATION_EPOCH_LENGTH = "SIMULATION_EPOCH_LENGTH"
 __SIMULATION_MAX_EPOCHS = "SIMULATION_MAX_EPOCHS"
-
-
-def status_queue_listener(message_queue, omega_name, manager_object):
-    """Listens to the given queue for status messages."""
-    status_message_type = StatusMessage.CLASS_MESSAGE_TYPE
-    status_message_value_ok = StatusMessage.STATUS_VALUES[0]
-
-    while True:
-        try:
-            message = message_queue.get(timeout=TIMEOUT_INTERVAL)
-            if message is None:
-                break
-        except queue.Empty:
-            FILE_LOGGER.info("No status messages received in {:d} seconds".format(TIMEOUT_INTERVAL))
-            continue
-
-        if isinstance(message, StatusMessage):
-            if message.simulation_id != manager_object.simulation_id:
-                FILE_LOGGER.info(
-                    "Received status message for a different simulation: '{:s}' instead of '{:s}'".format(
-                        message.simulation_id, manager_object.simulation_id))
-            elif message.message_type != status_message_type:
-                FILE_LOGGER.info(
-                    "Received a status message with wrong message type: '{:s}' instead of '{:s}'".format(
-                        message.message_type, status_message_type))
-            elif message.value != status_message_value_ok:
-                FILE_LOGGER.info(
-                    "Received a status message with an unknown value: '{:s}' instead of '{:s}'".format(
-                        message.value, status_message_value_ok))
-            elif message.source_process_id == omega_name:
-                FILE_LOGGER.debug("Received a status message from Omega")
-                manager_object.check_simulation_state(message.epoch_number)
-        else:
-            FILE_LOGGER.warning("Received '{:s}' message when expecting for '{:s}' message".format(
-                type(message), status_message_type))
 
 
 class SimulationManager:
@@ -63,16 +38,52 @@ class SimulationManager:
     SIMULATION_STATE_VALUE_RUNNING = "running"
     SIMULATION_STATE_VALUE_STOPPED = "stopped"
 
-    def __init__(self, rabbitmq_client, simulation_id, manager_name, max_epochs, state_topic, end_queue):
+    # The delay in seconds between the simulation state message and epoch message when starting the simulation.
+    MESSAGE_DELAY = 10
+
+    STATUS_MESSAGE_TYPE = StatusMessage.CLASS_MESSAGE_TYPE
+    STATUS_MESSAGE_VALUE_OK = StatusMessage.STATUS_VALUES[0]
+
+    def __init__(self, rabbitmq_client, simulation_id, manager_name, simulation_components,
+                 initial_start_time, epoch_length, max_epochs,
+                 epoch_topic, state_topic, status_topic, end_queue):
         self.__rabbitmq_client = rabbitmq_client
         self.__simulation_id = simulation_id
         self.__manager_name = manager_name
+        self.__simulation_components = simulation_components
+
         self.__simulation_state = SimulationManager.SIMULATION_STATE_VALUE_STOPPED
-        self.__epoch_number = -1
+        self.__epoch_number = 0
+        self.__epoch_length = epoch_length
         self.__max_epochs = max_epochs
+
+        self.__current_start_time = to_utc_datetime_object(initial_start_time)
+        self.__current_end_time = None
+
+        self.__epoch_topic = epoch_topic
         self.__state_topic = state_topic
+        self.__status_topic = status_topic
         self.__end_queue = end_queue
+
         self.__message_id_generator = get_next_message_id(self.manager_name)
+
+        self.__rabbitmq_client.add_listener(
+            self.__status_topic,
+            StatusMessageCallback(self.status_message_handler))
+
+    def start(self):
+        """Starts the simulation. Sends a simulation state message and an epoch message."""
+        LOGGER.info("Starting the simulation.")
+        self.simulation_state = SimulationManager.SIMULATION_STATE_VALUE_RUNNING
+        time.sleep(SimulationManager.MESSAGE_DELAY)
+        self.__send_epoch_message(False)
+
+    def stop(self, force=False):
+        """Pauses or stops the simulation. If the force paramater is True or the maximum epochs have been reached,
+           stops the simulation. Otherwise, only pauses the simulation.
+           Sends a simulation state message to the message bus."""
+        LOGGER.info("Stopping the simulation.")
+        self.simulation_state == SimulationManager.SIMULATION_STATE_VALUE_STOPPED
 
     @property
     def simulation_id(self):
@@ -83,6 +94,11 @@ class SimulationManager:
     def manager_name(self):
         """The simulation manager name."""
         return self.__manager_name
+
+    @property
+    def epoch_number(self):
+        """The name of the omega component in the simulation."""
+        return self.__epoch_number
 
     @property
     def max_epochs(self):
@@ -100,32 +116,77 @@ class SimulationManager:
                 SimulationManager.SIMULATION_STATE_VALUE_RUNNING,
                 SimulationManager.SIMULATION_STATE_VALUE_STOPPED):
             self.__simulation_state = new_simulation_state
+            self.send_state_message()
 
-    def check_simulation_state(self, omega_done_with_epoch):
-        """Called when Omega is finished with the current epoch.
-           Sends a simulation state message after updating the state."""
-        if omega_done_with_epoch < self.max_epochs:
-            self.simulation_state = SimulationManager.SIMULATION_STATE_VALUE_RUNNING
-        else:
-            self.simulation_state = SimulationManager.SIMULATION_STATE_VALUE_STOPPED
+    def check_components(self):
+        """Checks the status of the simulation components and sends a new epoch message if needed."""
+        latest_full_epoch = self.__simulation_components.get_latest_full_epoch()
 
-        self.__epoch_number = omega_done_with_epoch
-        self.send_state_message()
+        if self.simulation_state == SimulationManager.SIMULATION_STATE_VALUE_RUNNING:
+            # the current epoch is finished => send a new epoch message
+            if self.__epoch_number == 0 or latest_full_epoch == self.__epoch_number:
+                self.__send_epoch_message()
 
     def send_state_message(self):
         """Sends a simulation state message."""
+        LOGGER.debug("Sending state message: '{:s}'".format(self.simulation_state))
+
         new_simulation_state_message = self.__get_simulation_state_message()
         self.__rabbitmq_client.send_message(self.__state_topic, new_simulation_state_message)
 
-        if (self.__epoch_number == 0 and
-                self.simulation_state == SimulationManager.SIMULATION_STATE_VALUE_RUNNING):
-            print("Starting the simulation", flush=True)
-        elif (self.__epoch_number >= self.max_epochs and
-              self.simulation_state == SimulationManager.SIMULATION_STATE_VALUE_STOPPED):
-            print("Stopping the simulation", flush=True)
+        if self.simulation_state == SimulationManager.SIMULATION_STATE_VALUE_RUNNING:
+            if self.epoch_number == 0:
+                LOGGER.debug("Starting the simulation.")
+            else:
+                LOGGER.debug("Restarting the simulation.")
+        elif self.simulation_state == SimulationManager.SIMULATION_STATE_VALUE_STOPPED:
+            if self.epoch_number < self.max_epochs:
+                LOGGER.debug("Pausing the simulation.")
+            else:
+                LOGGER.debug("Stopping the simulation.")
 
-            time.sleep(TIMEOUT_INTERVAL)
-            self.__end_queue.put(None)
+                time.sleep(TIMEOUT_INTERVAL)
+                self.__end_queue.put(None)
+
+    def status_message_handler(self, message_object, message_routing_key):
+        """Handles received status messages."""
+        if isinstance(message_object, StatusMessage):
+            if message_object.simulation_id != self.simulation_id:
+                LOGGER.info(
+                    "Received status message for a different simulation: '{:s}' instead of '{:s}'".format(
+                        message_object.simulation_id, self.simulation_id))
+            elif message_object.message_type != SimulationManager.STATUS_MESSAGE_TYPE:
+                LOGGER.info(
+                    "Received a status message with wrong message type: '{:s}' instead of '{:s}'".format(
+                        message_object.message_type, SimulationManager.STATUS_MESSAGE_TYPE))
+            elif message_object.value != SimulationManager.STATUS_MESSAGE_VALUE_OK:
+                LOGGER.info(
+                    "Received a status message with an unknown value: '{:s}' instead of '{:s}'".format(
+                        message_object.value, SimulationManager.STATUS_MESSAGE_VALUE_OK))
+            elif message_object.source_process_id != self.__manager_name:
+                LOGGER.debug("Received a status message from {:s}".format(message_object.source_process_id))
+                self.__simulation_components.register_ready_message(
+                    message_object.source_process_id, message_object.epoch_number)
+                self.check_components()
+        else:
+            LOGGER.warning("Received '{:s}' message when expecting for '{:s}' message".format(
+                str(type(message_object)), SimulationManager.STATUS_MESSAGE_TYPE))
+
+    def __send_epoch_message(self, new_epoch=True):
+        if new_epoch or self.epoch_number == 0:
+            self.__epoch_number += 1
+            if self.__current_end_time is not None:
+                self.__current_start_time = self.__current_end_time
+            self.__current_end_time = self.__current_start_time + datetime.timedelta(seconds=self.__epoch_length)
+
+        if self.epoch_number <= self.max_epochs:
+            new_epoch_message = self.__get_epoch_message(EpochMessage.CLASS_MESSAGE_TYPE)
+            self.__rabbitmq_client.send_message(self.__epoch_topic, new_epoch_message)
+
+            LOGGER.info("Starting epoch {:d}".format(self.__epoch_number))
+
+        else:
+            self.stop()
 
     def __get_simulation_state_message(self):
         """Return epoch message."""
@@ -137,51 +198,71 @@ class SimulationManager:
             "SimulationState": self.simulation_state
         })
         if state_message is None:
-            FILE_LOGGER.error("Problem with creating a simulation state message")
+            LOGGER.error("Problem with creating a simulation state message")
 
         return state_message.bytes()
 
+    def __get_epoch_message(self, message_type):
+        """Returns a new message for the message bus."""
+        epoch_message = EpochMessage(**{
+            "Type": message_type,
+            "SimulationId": self.simulation_id,
+            "SourceProcessId": self.manager_name,
+            "MessageId": next(self.__message_id_generator),
+            "EpochNumber": self.epoch_number,
+            "TriggeringMessageIds": ["placeholder"],
+            "StartTime": self.__current_start_time,
+            "EndTime": self.__current_end_time
+        })
+        if epoch_message is None:
+            LOGGER.error("Problem with creating a epoch message")
+
+        return epoch_message.bytes()
+
 
 def start_manager():
-    """Simple test for the Simulation manager process."""
+    """Starts the Simulation manager process."""
     env_variables = load_environmental_variables(
         (__SIMULATION_ID, str),
         (__SIMULATION_MANAGER_NAME, str, "manager"),
-        (__SIMULATION_OMEGA_NAME, str, "omega"),
+        (__SIMULATION_COMPONENTS, str, ""),
+        (__SIMULATION_EPOCH_MESSAGE_TOPIC, str, "epoch"),
         (__SIMULATION_STATUS_MESSAGE_TOPIC, str, "status"),
         (__SIMULATION_STATE_MESSAGE_TOPIC, str, "state"),
+        (__SIMULATION_EPOCH_LENGTH, int, 3600),
+        (__SIMULATION_INITIAL_START_TIME, str, "2020-01-01T00:00:00.000Z"),
         (__SIMULATION_MAX_EPOCHS, int, 5)
     )
+
+    simulation_components = SimulationComponents()
+    for component_name in env_variables[__SIMULATION_COMPONENTS].split(","):
+        simulation_components.add_component(component_name)
 
     time.sleep(TIMEOUT_INTERVAL / 5)
 
     message_client = RabbitmqClient()
-
-    status_queue = queue.Queue()
-    status_callback = StatusMessageCallback(status_queue)
-    message_client.add_listener(env_variables[__SIMULATION_STATUS_MESSAGE_TOPIC], status_callback)
 
     end_queue = queue.Queue()
     manager = SimulationManager(
         message_client,
         env_variables[__SIMULATION_ID],
         env_variables[__SIMULATION_MANAGER_NAME],
+        simulation_components,
+        env_variables[__SIMULATION_INITIAL_START_TIME],
+        env_variables[__SIMULATION_EPOCH_LENGTH],
         env_variables[__SIMULATION_MAX_EPOCHS],
+        env_variables[__SIMULATION_EPOCH_MESSAGE_TOPIC],
         env_variables[__SIMULATION_STATE_MESSAGE_TOPIC],
+        env_variables[__SIMULATION_STATUS_MESSAGE_TOPIC],
         end_queue)
 
-    status_listener = threading.Thread(
-        target=status_queue_listener,
-        args=(
-            status_queue,
-            env_variables[__SIMULATION_OMEGA_NAME],
-            manager),
-        daemon=True)
-    status_listener.start()
+    time.sleep(15)
+    manager.start()
 
     while True:
         end_item = end_queue.get()
         if end_item is None:
+            LOGGER.info("Closing the simulation manager: '{:s}'".format(manager.manager_name))
             message_client.close()
             break
 

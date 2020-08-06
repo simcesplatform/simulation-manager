@@ -7,9 +7,9 @@ import json
 from tools.exceptions.messages import MessageDateError, MessageIdError, MessageSourceError, MessageTypeError, \
                                       MessageValueError, MessageEpochValueError, MessageStateValueError
 from tools.datetime_tools import get_utcnow_in_milliseconds, to_iso_format_datetime_string
-from tools.tools import get_logger
+from tools.tools import FullLogger
 
-FILE_LOGGER = get_logger(__name__)
+LOGGER = FullLogger(__name__)
 
 
 def get_next_message_id(source_process_id: str, start_number=1):
@@ -36,14 +36,14 @@ def validate_json(message_class, json_message: dict):
     for json_attribute_name, object_attribute_name in message_class.MESSAGE_ATTRIBUTES_FULL.items():
         if (json_attribute_name not in json_message and
                 json_attribute_name not in message_class.OPTIONAL_ATTRIBUTES_FULL):
-            FILE_LOGGER.warning("%s attribute is missing from the message", json_attribute_name)
+            LOGGER.warning("%s attribute is missing from the message", json_attribute_name)
             return False
 
         if not getattr(
                 message_class,
                 "_".join(["_check", object_attribute_name]))(json_message.get(json_attribute_name, None)):
             # TODO: handle checking for missing timezone information
-            FILE_LOGGER.warning(
+            LOGGER.warning(
                 "'%s' is not valid message value for %s",
                 str(json_message[json_attribute_name]), json_attribute_name)
             return False

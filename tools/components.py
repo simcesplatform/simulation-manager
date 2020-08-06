@@ -4,7 +4,7 @@
 
 import tools.tools as tools
 
-FILE_LOGGER = tools.get_logger(__name__)
+LOGGER = tools.FullLogger(__name__)
 
 
 class SimulationComponents():
@@ -14,7 +14,7 @@ class SimulationComponents():
 
     def __init__(self):
         self.__components = {}
-        FILE_LOGGER.debug("New SimulationComponents object created.")
+        LOGGER.debug("New SimulationComponents object created.")
 
         # invariant: self.__latest_full_epoch <= for all self.__components[component_value]
         self.__latest_full_epoch = SimulationComponents.NO_MESSAGES
@@ -24,37 +24,37 @@ class SimulationComponents():
            If the given component_name is already in the list, the function prints an error message."""
         if component_name not in self.__components:
             self.__components[component_name] = SimulationComponents.NO_MESSAGES
-            FILE_LOGGER.info("Component: %s registered to SimulationComponents.", component_name)
+            LOGGER.info("Component: %s registered to SimulationComponents.", component_name)
         else:
-            FILE_LOGGER.warning("%s is already registered to the simulation component list", component_name)
+            LOGGER.warning("%s is already registered to the simulation component list", component_name)
 
     def remove_component(self, component_name: str):
         """Removes the given component from the simulation component list.
            If the given component_name is not found in the list, the function prints an error message."""
         if self.__components.pop(component_name, None) is None:
-            FILE_LOGGER.warning("%s was not found in the simulation component list", component_name)
+            LOGGER.warning("%s was not found in the simulation component list", component_name)
         else:
-            FILE_LOGGER.info("Component: %s removed from SimulationComponents.", component_name)
+            LOGGER.info("Component: %s removed from SimulationComponents.", component_name)
 
         self._update_latest_full_epoch()
 
     def register_ready_message(self, component_name: str, epoch_number: int):
         """Registers a new ready message for the given component and epoch number."""
         if component_name not in self.__components:
-            FILE_LOGGER.warning("%s was not found in the simulation component list", component_name)
+            LOGGER.warning("%s was not found in the simulation component list", component_name)
         elif epoch_number < 1:
-            FILE_LOGGER.warning("%d is not acceptable epoch number", epoch_number)
+            LOGGER.warning("%d is not acceptable epoch number", epoch_number)
         elif epoch_number <= self.__components[component_name]:
-            FILE_LOGGER.warning("%d is not larger epoch number than the previous %d",
+            LOGGER.warning("%d is not larger epoch number than the previous %d",
                                 epoch_number, self.__components[component_name])
         else:
             if (epoch_number != self.__components[component_name] + 1 and
                     self.__components[component_name] != SimulationComponents.NO_MESSAGES):
-                FILE_LOGGER.warning("%d is not the next epoch, previous was %d",
+                LOGGER.warning("%d is not the next epoch, previous was %d",
                                     epoch_number, self.__components[component_name])
             self.__components[component_name] = epoch_number
             self._update_latest_full_epoch()
-            FILE_LOGGER.info("Ready message for epoch %d from component %s registered.",
+            LOGGER.debug("Ready message for epoch %d from component %s registered.",
                              epoch_number, component_name)
 
     def get_component_list(self, latest_epoch_less_than=None):
