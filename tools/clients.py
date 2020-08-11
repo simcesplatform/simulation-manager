@@ -9,9 +9,9 @@ import threading
 import aio_pika
 
 from tools.messages import AbstractMessage
-from tools.tools import get_logger, load_environmental_variables
+from tools.tools import FullLogger, load_environmental_variables
 
-FILE_LOGGER = get_logger(__name__)
+LOGGER = FullLogger(__name__)
 
 
 def default_env_variable_definitions():
@@ -47,6 +47,7 @@ class RabbitmqClient:
     """RabbitMQ client that can be used to send messages and to create topic listeners."""
     DEFAULT_ENV_VARIABLE_PREFIX = "RABBITMQ_"
     CONNECTION_PARAMTERS = ["host", "port", "login", "password", "ssl"]
+    OPTIONAL_SSL_PARAMETER_TOP = "ssl_options"
     OPTIONAL_SSL_PARAMETER = "ssl_version"
     MESSAGE_ENCODING = "UTF-8"
 
@@ -111,9 +112,9 @@ class RabbitmqClient:
     @classmethod
     def send_thread(cls, connection_parameters, exchange_name, send_queue):
         """The send thread loop that listens to the queue and sends the received messages to the message bus."""
-        FILE_LOGGER.info("Opening sender thread for RabbitMQ client")
+        LOGGER.info("Opening sender thread for RabbitMQ client")
         asyncio.run(cls.start_send_connection(connection_parameters, exchange_name, send_queue))
-        FILE_LOGGER.info("Closing sender thread for RabbitMQ client")
+        LOGGER.info("Closing sender thread for RabbitMQ client")
 
     @classmethod
     async def start_send_connection(cls, connection_parameters, exchange_name, send_queue):
@@ -136,18 +137,18 @@ class RabbitmqClient:
                         message = message.bytes()
                     await rabbitmq_exchange.publish(aio_pika.Message(message), routing_key=topic_name)
 
-                    FILE_LOGGER.debug("Message '{:s}' send to topic: '{:s}'".format(
+                    LOGGER.debug("Message '{:s}' send to topic: '{:s}'".format(
                         message.decode(cls.MESSAGE_ENCODING), topic_name))
                 else:
-                    FILE_LOGGER.warning("Invalid message '{:s}' received in sender thread".format(message_item))
+                    LOGGER.warning("Invalid message '{:s}' received in sender thread".format(message_item))
 
     @classmethod
     def listener_thread(cls, connection_parameters, exchange_name, topic_name, callback_class):
         """The listener thread loop that listens to the given topic in the message bus and
            sends the received messages to the send function of the given callback class."""
-        FILE_LOGGER.info("Opening listener thread for RabbitMQ client for the topic '{:s}'".format(topic_name))
+        LOGGER.info("Opening listener thread for RabbitMQ client for the topic '{:s}'".format(topic_name))
         asyncio.run(cls.start_listen_connection(connection_parameters, exchange_name, topic_name, callback_class))
-        FILE_LOGGER.info("Closing listener thread for RabbitMQ client for the topic '{:s}'".format(topic_name))
+        LOGGER.info("Closing listener thread for RabbitMQ client for the topic '{:s}'".format(topic_name))
 
     @classmethod
     async def start_listen_connection(cls, connection_parameters, exchange_name, topic_name, callback_class):
@@ -168,12 +169,12 @@ class RabbitmqClient:
 
             # Binding the queue
             await rabbitmq_queue.bind(rabbitmq_exchange, routing_key=topic_name)
-            FILE_LOGGER.info("Now listening to messages; exc={:s}, topic={:s}".format(exchange_name, topic_name))
+            LOGGER.info("Now listening to messages; exc={:s}, topic={:s}".format(exchange_name, topic_name))
 
             async with rabbitmq_queue.iterator() as queue_iter:
                 async for message in queue_iter:
                     async with message.process():
-                        FILE_LOGGER.debug("Message '{:s}' received from topic: '{:s}'".format(
+                        LOGGER.debug("Message '{:s}' received from topic: '{:s}'".format(
                             message.body.decode(cls.MESSAGE_ENCODING), message.routing_key))
                         callback_class.callback(message)
 
@@ -186,7 +187,7 @@ class RabbitmqClient:
             if config_parameter in cls.CONNECTION_PARAMTERS
         }
         if stripped_connection_config["ssl"]:
-            stripped_connection_config[cls.OPTIONAL_SSL_PARAMETER] = {
+            stripped_connection_config[cls.OPTIONAL_SSL_PARAMETER_TOP] = {
                 cls.OPTIONAL_SSL_PARAMETER: connection_config_dict[cls.OPTIONAL_SSL_PARAMETER]
             }
 
