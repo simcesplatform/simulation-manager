@@ -11,7 +11,7 @@ from tools.callbacks import GeneralMessageCallback
 from tools.clients import RabbitmqClient
 from tools.components import SimulationComponents
 from tools.datetime_tools import to_utc_datetime_object
-from tools.messages import EpochMessage, StatusMessage, SimulationStateMessage, get_next_message_id
+from tools.messages import EpochMessage, ErrorMessage, StatusMessage, SimulationStateMessage, get_next_message_id
 from tools.tools import FullLogger, load_environmental_variables
 
 LOGGER = FullLogger(__name__)
@@ -25,6 +25,7 @@ __SIMULATION_OMEGA_NAME = "SIMULATION_OMEGA_NAME"
 __SIMULATION_EPOCH_MESSAGE_TOPIC = "SIMULATION_EPOCH_MESSAGE_TOPIC"
 __SIMULATION_STATUS_MESSAGE_TOPIC = "SIMULATION_STATUS_MESSAGE_TOPIC"
 __SIMULATION_STATE_MESSAGE_TOPIC = "SIMULATION_STATE_MESSAGE_TOPIC"
+__SIMULATION_ERROR_MESSAGE_TOPIC = "SIMULATION_ERROR_MESSAGE_TOPIC"
 
 __SIMULATION_COMPONENTS = "SIMULATION_COMPONENTS"
 
@@ -38,12 +39,11 @@ class SimulationManager:
     SIMULATION_STATE_VALUE_RUNNING = SimulationStateMessage.SIMULATION_STATES[0]   # "running"
     SIMULATION_STATE_VALUE_STOPPED = SimulationStateMessage.SIMULATION_STATES[-1]  # "stopped"
 
-    STATUS_MESSAGE_TYPE = StatusMessage.CLASS_MESSAGE_TYPE
     STATUS_MESSAGE_VALUE_OK = StatusMessage.STATUS_VALUES[0]
 
     def __init__(self, rabbitmq_client, simulation_id, manager_name, simulation_components,
                  initial_start_time, epoch_length, max_epochs,
-                 epoch_topic, state_topic, status_topic, end_queue):
+                 epoch_topic, state_topic, status_topic, error_topic, end_queue):
         self.__rabbitmq_client = rabbitmq_client
         self.__simulation_id = simulation_id
         self.__manager_name = manager_name
@@ -60,13 +60,17 @@ class SimulationManager:
         self.__epoch_topic = epoch_topic
         self.__state_topic = state_topic
         self.__status_topic = status_topic
+        self.__error_topic = error_topic
         self.__end_queue = end_queue
 
         self.__message_id_generator = get_next_message_id(self.manager_name)
 
         self.__rabbitmq_client.add_listeners(
-            self.__status_topic,
-            GeneralMessageCallback(self.status_message_handler))
+            [
+                self.__status_topic,
+                self.__error_topic
+            ],
+            GeneralMessageCallback(self.general_message_handler))
 
     def start(self):
         """Starts the simulation. Sends a simulation state message."""
@@ -133,29 +137,50 @@ class SimulationManager:
         new_simulation_state_message = self.__get_simulation_state_message()
         self.__rabbitmq_client.send_message(self.__state_topic, new_simulation_state_message)
 
+    def general_message_handler(self, message_object, message_routing_key):
+        """Forwards the message handling to the appropriate function depending on the message type."""
+        if isinstance(message_object, StatusMessage):
+            self.status_message_handler(message_object, message_routing_key)
+        elif isinstance(message_object, ErrorMessage):
+            self.error_message_handler(message_object, message_routing_key)
+        else:
+            LOGGER.warning("Received '{:s}' message when expecting for '{:s}' or '{:s}' message".format(
+                str(type(message_object)), str(StatusMessage), str(ErrorMessage)))
+
     def status_message_handler(self, message_object, message_routing_key):
         """Handles received status messages."""
-        if isinstance(message_object, StatusMessage):
-            if message_object.simulation_id != self.simulation_id:
-                LOGGER.info(
-                    "Received status message for a different simulation: '{:s}' instead of '{:s}'".format(
-                        message_object.simulation_id, self.simulation_id))
-            elif message_object.message_type != SimulationManager.STATUS_MESSAGE_TYPE:
-                LOGGER.info(
-                    "Received a status message with wrong message type: '{:s}' instead of '{:s}'".format(
-                        message_object.message_type, SimulationManager.STATUS_MESSAGE_TYPE))
-            elif message_object.value != SimulationManager.STATUS_MESSAGE_VALUE_OK:
-                LOGGER.info(
-                    "Received a status message with an unknown value: '{:s}' instead of '{:s}'".format(
-                        message_object.value, SimulationManager.STATUS_MESSAGE_VALUE_OK))
-            elif message_object.source_process_id != self.__manager_name:
-                LOGGER.debug("Received a status message from {:s}".format(message_object.source_process_id))
-                self.__simulation_components.register_ready_message(
-                    message_object.source_process_id, message_object.epoch_number)
-                self.check_components()
+        if message_object.simulation_id != self.simulation_id:
+            LOGGER.info(
+                "Received a status message for a different simulation: '{:s}' instead of '{:s}'".format(
+                    message_object.simulation_id, self.simulation_id))
+        elif message_object.message_type != StatusMessage.CLASS_MESSAGE_TYPE:
+            LOGGER.warning(
+                "Received a status message with wrong message type: '{:s}' instead of '{:s}'".format(
+                    message_object.message_type, StatusMessage.CLASS_MESSAGE_TYPE))
+        elif message_object.value != SimulationManager.STATUS_MESSAGE_VALUE_OK:
+            LOGGER.warning(
+                "Received a status message with an unknown value: '{:s}' instead of '{:s}'".format(
+                    message_object.value, SimulationManager.STATUS_MESSAGE_VALUE_OK))
+        elif message_object.source_process_id != self.__manager_name:
+            LOGGER.debug("Received a status message from {:s}".format(message_object.source_process_id))
+            self.__simulation_components.register_ready_message(
+                message_object.source_process_id, message_object.epoch_number)
+            self.check_components()
+
+    def error_message_handler(self, message_object, message_routing_key):
+        """Handles received error messages."""
+        if message_object.simulation_id != self.simulation_id:
+            LOGGER.info(
+                "Received an error message for a different simulation: '{:s}' instead of '{:s}'".format(
+                    message_object.simulation_id, self.simulation_id))
+        elif message_object.message_type != ErrorMessage.CLASS_MESSAGE_TYPE:
+            LOGGER.warning(
+                "Received an error message with wrong message type: '{:s}' instead of '{:s}'".format(
+                    message_object.message_type, ErrorMessage.CLASS_MESSAGE_TYPE))
         else:
-            LOGGER.warning("Received '{:s}' message when expecting for '{:s}' message".format(
-                str(type(message_object)), str(StatusMessage)))
+            LOGGER.debug("Received an error message from {:s} with description '{:s}'".format(
+                message_object.source_process_id, message_object.description))
+            self.stop()
 
     def __send_epoch_message(self, new_epoch=True):
         if new_epoch or self.epoch_number == 0:
@@ -214,6 +239,7 @@ def start_manager():
         (__SIMULATION_EPOCH_MESSAGE_TOPIC, str, "epoch"),
         (__SIMULATION_STATUS_MESSAGE_TOPIC, str, "status"),
         (__SIMULATION_STATE_MESSAGE_TOPIC, str, "state"),
+        (__SIMULATION_ERROR_MESSAGE_TOPIC, str, "error"),
         (__SIMULATION_EPOCH_LENGTH, int, 3600),
         (__SIMULATION_INITIAL_START_TIME, str, "2020-01-01T00:00:00.000Z"),
         (__SIMULATION_MAX_EPOCHS, int, 5)
@@ -237,6 +263,7 @@ def start_manager():
         env_variables[__SIMULATION_EPOCH_MESSAGE_TOPIC],
         env_variables[__SIMULATION_STATE_MESSAGE_TOPIC],
         env_variables[__SIMULATION_STATUS_MESSAGE_TOPIC],
+        env_variables[__SIMULATION_ERROR_MESSAGE_TOPIC],
         end_queue)
 
     # wait a bit to allow other components to initialize and then start the simulation

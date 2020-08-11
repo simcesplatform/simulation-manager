@@ -9,7 +9,7 @@ import time
 
 from tools.callbacks import GeneralMessageCallback
 from tools.clients import RabbitmqClient
-from tools.messages import EpochMessage, StatusMessage, SimulationStateMessage, get_next_message_id
+from tools.messages import EpochMessage, ErrorMessage, StatusMessage, SimulationStateMessage, get_next_message_id
 from tools.tools import FullLogger, load_environmental_variables
 
 LOGGER = FullLogger(__name__)
@@ -21,9 +21,11 @@ __SIMULATION_COMPONENT_NAME = "SIMULATION_COMPONENT_NAME"
 __SIMULATION_EPOCH_MESSAGE_TOPIC = "SIMULATION_EPOCH_MESSAGE_TOPIC"
 __SIMULATION_STATUS_MESSAGE_TOPIC = "SIMULATION_STATUS_MESSAGE_TOPIC"
 __SIMULATION_STATE_MESSAGE_TOPIC = "SIMULATION_STATE_MESSAGE_TOPIC"
+__SIMULATION_ERROR_MESSAGE_TOPIC = "SIMULATION_ERROR_MESSAGE_TOPIC"
 
 __MIN_SLEEP_TIME = "MIN_SLEEP_TIME"
 __MAX_SLEEP_TIME = "MAX_SLEEP_TIME"
+__ERROR_CHANGE = "ERROR_CHANGE"
 
 
 class DummyComponent:
@@ -32,8 +34,8 @@ class DummyComponent:
     SIMULATION_STATE_VALUE_STOPPED = SimulationStateMessage.SIMULATION_STATES[-1]  # "stopped"
 
     def __init__(self, rabbitmq_client, simulation_id, component_name,
-                 simulation_state_topic, epoch_topic, status_topic,
-                 min_delay, max_delay, end_queue):
+                 simulation_state_topic, epoch_topic, status_topic, error_topic,
+                 min_delay, max_delay, error_change, end_queue):
         self.__rabbitmq_client = rabbitmq_client
         self.__simulation_id = simulation_id
         self.__component_name = component_name
@@ -41,9 +43,11 @@ class DummyComponent:
         self.__simulation_state_topic = simulation_state_topic
         self.__epoch_topic = epoch_topic
         self.__status_topic = status_topic
+        self.__error_topic = error_topic
 
         self.__min_delay = min_delay
         self.__max_delay = max_delay
+        self.__error_change = error_change
 
         self.__simulation_state = DummyComponent.SIMULATION_STATE_VALUE_STOPPED
         self.__latest_epoch = 0
@@ -67,6 +71,11 @@ class DummyComponent:
     def component_name(self):
         """The component name in the simulation."""
         return self.__component_name
+
+    def stop(self):
+        """Stops the component."""
+        LOGGER.info("Stopping the component: '{:s}'".format(self.component_name))
+        self.simulation_state = DummyComponent.SIMULATION_STATE_VALUE_STOPPED
 
     @property
     def simulation_state(self):
@@ -93,11 +102,15 @@ class DummyComponent:
         if self.__simulation_state == DummyComponent.SIMULATION_STATE_VALUE_RUNNING:
             self.__latest_epoch = epoch_number
 
-            rand_wait_time = random.randint(self.__min_delay, self.__max_delay)
-            LOGGER.info("Component {:s} sending status message for epoch {:d} in {:d} seconds.".format(
-                self.__component_name, self.__latest_epoch, rand_wait_time))
-            time.sleep(rand_wait_time)
-            self.__send_new_status_message()
+            rand_error_change = random.random()
+            if rand_error_change < self.__error_change:
+                self.__send_error_message("Bad error")
+            else:
+                rand_wait_time = random.randint(self.__min_delay, self.__max_delay)
+                LOGGER.info("Component {:s} sending status message for epoch {:d} in {:d} seconds.".format(
+                    self.__component_name, self.__latest_epoch, rand_wait_time))
+                time.sleep(rand_wait_time)
+                self.__send_new_status_message()
 
     def general_message_handler(self, message_object, message_routing_key):
         """Forwards the message handling to the appropriate function depending on the message type."""
@@ -143,6 +156,10 @@ class DummyComponent:
         new_status_message = self.__get_status_message()
         self.__rabbitmq_client.send_message(self.__status_topic, new_status_message)
 
+    def __send_error_message(self, description):
+        error_message = self.__get_error_message(description)
+        self.__rabbitmq_client.send_message(self.__error_topic, error_message)
+
     def __get_status_message(self):
         status_message = StatusMessage(**{
             "Type": StatusMessage.CLASS_MESSAGE_TYPE,
@@ -158,6 +175,21 @@ class DummyComponent:
 
         return status_message.bytes()
 
+    def __get_error_message(self, description):
+        error_message = ErrorMessage(**{
+            "Type": ErrorMessage.CLASS_MESSAGE_TYPE,
+            "SimulationId": self.simulation_id,
+            "SourceProcessId": self.component_name,
+            "MessageId": next(self.__message_id_generator),
+            "EpochNumber": self.__latest_epoch,
+            "TriggeringMessageIds": ["placeholder"],
+            "Description": description
+        })
+        if error_message is None:
+            LOGGER.error("Problem with creating an error message")
+
+        return error_message.bytes()
+
 
 def start_dummy_component():
     """Start a dummy component for the simulation platform."""
@@ -167,8 +199,10 @@ def start_dummy_component():
         (__SIMULATION_EPOCH_MESSAGE_TOPIC, str, "epoch"),
         (__SIMULATION_STATUS_MESSAGE_TOPIC, str, "status"),
         (__SIMULATION_STATE_MESSAGE_TOPIC, str, "state"),
+        (__SIMULATION_ERROR_MESSAGE_TOPIC, str, "error"),
         (__MIN_SLEEP_TIME, int, 2),
-        (__MAX_SLEEP_TIME, int, 15)
+        (__MAX_SLEEP_TIME, int, 15),
+        (__ERROR_CHANGE, float, 0.0)
     )
 
     message_client = RabbitmqClient()
@@ -181,8 +215,10 @@ def start_dummy_component():
         env_variables[__SIMULATION_STATE_MESSAGE_TOPIC],
         env_variables[__SIMULATION_EPOCH_MESSAGE_TOPIC],
         env_variables[__SIMULATION_STATUS_MESSAGE_TOPIC],
+        env_variables[__SIMULATION_ERROR_MESSAGE_TOPIC],
         env_variables[__MIN_SLEEP_TIME],
         env_variables[__MAX_SLEEP_TIME],
+        env_variables[__ERROR_CHANGE],
         end_queue)
 
     while True:
