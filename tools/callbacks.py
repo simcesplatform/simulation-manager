@@ -2,6 +2,7 @@
 
 """This module contains classes for the callbacks for the RabbitMQ message bus listeners."""
 
+import inspect
 import json
 import threading
 
@@ -41,16 +42,19 @@ class AbstractMessageCallback:
         """Returns the topic from which the last message was received."""
         return self._last_topic
 
-    def callback(self, message):
+    async def callback(self, message):
         """Callback function for the received messages."""
         with self._lock:
             message_str = message.body.decode(AbstractMessageCallback.MESSAGE_CODING)
             message_json = json.loads(message_str)
             message_object = self._message_type.from_json(message_json)
 
-            self.last_message = message_object
-            self.last_topic = message.routing_key
-            self._callback_function(message_object, message.routing_key)
+            self._last_message = message_object
+            self._last_topic = message.routing_key
+            if inspect.iscoroutinefunction(self._callback_function):
+                await self._callback_function(message_object, message.routing_key)
+            else:
+                LOGGER.error("Callback function '{:s}' is not awaitable.".format(str(type(self._callback_function))))
 
             self.log_last_message()
 
@@ -118,7 +122,7 @@ class GeneralMessageCallback(AbstractMessageCallback):
     #     super().__init__(callback_function, message_type)
     #     self.__lock = threading.Lock()
 
-    def callback(self, message):
+    async def callback(self, message):
         """General allback function for the received messages."""
         with self._lock:
             message_str = message.body.decode(AbstractMessageCallback.MESSAGE_CODING)
@@ -134,6 +138,9 @@ class GeneralMessageCallback(AbstractMessageCallback):
 
             self._last_message = message_object
             self._last_topic = message.routing_key
-            self._callback_function(message_object, message.routing_key)
+            if inspect.iscoroutinefunction(self._callback_function):
+                await self._callback_function(message_object, message.routing_key)
+            else:
+                LOGGER.error("Callback function '{:s}' is not awaitable.".format(str(type(self._callback_function))))
 
             self.log_last_message()

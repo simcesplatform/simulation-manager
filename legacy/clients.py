@@ -14,6 +14,9 @@ from tools.tools import FullLogger, load_environmental_variables
 
 LOGGER = FullLogger(__name__)
 
+LONG_TIMEOUT_INTERVAL = 60  # wait this long for a new message to before printing debug output
+SHORT_TIMEOUT_INTERVAL = 30  # wait this long for a new message to be sent while having open connection
+
 
 def default_env_variable_definitions():
     """Returns the default environment variable definitions."""
@@ -48,6 +51,16 @@ def validate_message(topic_name, message_to_publish):
     """Validates the message received from a queue for publishing.
        Returns a tuple (topic_name: str, message_to_publish: bytes) if the message is valid.
        Otherwise, returns (None, None)."""
+    # if not isinstance(queue_message, (list, tuple)):
+    #     LOGGER.warning("Wrong message type ('{:s})' sent to publish queue.".format(str(type(message_item))))
+    #     return None
+
+    # if len(queue_message) != 2:
+    #     LOGGER.warning("Incompatible list (length: {:d} != 2) sent to publish queue.".format(len(queue_message)))
+    #     return None
+
+    # topic_name, message_to_publish = queue_message
+
     if not isinstance(topic_name, str):
         topic_name = str(topic_name)
     if isinstance(message_to_publish, AbstractMessage):
@@ -79,6 +92,18 @@ class RabbitmqClient:
         self.__connection_parameters = RabbitmqClient.__get_connection_parameters_only(kwargs)
         self.__exchange_name = kwargs["exchange"]
 
+        # self.__send_queue = queue.Queue()
+        # self.__send_thread = threading.Thread(
+        #     name="sender_thread",
+        #     target=RabbitmqClient.send_thread,
+        #     daemon=True,
+        #     kwargs={
+        #         "connection_parameters": self.__connection_parameters,
+        #         "exchange_name": self.__exchange_name,
+        #         "send_queue": self.__send_queue
+        #     })
+        # self.__send_thread.start()
+
         self.__listeners = {}
 
     def close(self):
@@ -99,9 +124,11 @@ class RabbitmqClient:
 
         new_listener_thread = threading.Thread(
             name="listen_thread_{:s}".format(",".join(topic_names)),
-            target=self.listener_thread,
+            target=RabbitmqClient.listener_thread,
             daemon=True,
             kwargs={
+                "connection_parameters": self.__connection_parameters,
+                "exchange_name": self.__exchange_name,
                 "topic_names": topic_names,
                 "callback_class": callback_class
             })
@@ -120,6 +147,12 @@ class RabbitmqClient:
         # self.__send_queue.put((topic_name, message_bytes))
         publish_message_task = asyncio.create_task(self.send_task(topic_name, message_bytes))
         await asyncio.wait([publish_message_task])
+
+    # @classmethod
+    # def send_thread(cls, connection_parameters, exchange_name, send_queue):
+        # """The send thread loop that listens to the queue and sends the received messages to the message bus."""
+        # LOGGER.info("Starting sender thread for RabbitMQ client")
+        # asyncio.run(cls.start_send_connection(connection_parameters, exchange_name, send_queue))
 
     async def send_task(self, topic_name, message_to_publish):
         """Publishes the given message to the given topic."""
@@ -141,24 +174,87 @@ class RabbitmqClient:
         except Exception as error:
             LOGGER.warning("Error: '{:s}' when trying to publish message.".format(str(error)))
 
-    def listener_thread(self, topic_names, callback_class):
+    # @classmethod
+    # async def start_send_connection(cls, connection_parameters, exchange_name, send_queue):
+    #     """The actual connection and queue listener function for the sender thread."""
+
+    #     program_is_alive = True
+    #     message_sent_connection_counter = 0
+    #     last_publish_time = time.time()
+
+    #     while program_is_alive:
+    #         # Wait for the first message to send before starting a connection.
+    #         try:
+    #             message_item = send_queue.get(timeout=LONG_TIMEOUT_INTERVAL)
+    #             if message_item is None:
+    #                 break
+    #         except queue.Empty:
+    #             LOGGER.debug("{:.1f} seconds without any messages to publish".format(time.time() - last_publish_time))
+    #             continue
+
+    #         validated_message_item = validate_queue_message(message_item)
+    #         if validated_message_item is None:
+    #             continue
+    #         topic_name, message_to_publish = validated_message_item
+
+    #         try:
+    #             rabbitmq_connection = await aio_pika.connect_robust(**connection_parameters)
+    #             message_sent_connection_counter += 1
+
+    #             async with rabbitmq_connection:
+    #                 rabbitmq_channel = await rabbitmq_connection.channel()
+    #                 rabbitmq_exchange = await rabbitmq_channel.declare_exchange(
+    #                     exchange_name, aio_pika.exchange.ExchangeType.TOPIC)
+
+    #                 while True:
+    #                     LOGGER.debug("{:d} {:s} {:s}".format(message_sent_connection_counter, topic_name, str(message_to_publish)))
+    #                     await rabbitmq_exchange.publish(
+    #                         aio_pika.Message(message_to_publish),
+    #                         routing_key=topic_name)
+    #                     last_publish_time = time.time()
+    #                     LOGGER.debug("Message '{:s}' send to topic: '{:s}' ({:d})".format(
+    #                         message_to_publish.decode(cls.MESSAGE_ENCODING),
+    #                         topic_name,
+    #                         message_sent_connection_counter))
+
+    #                     try:
+    #                         LOGGER.debug("{:.1f}".format(max(SHORT_TIMEOUT_INTERVAL - (time.time() - last_publish_time), 1)))
+    #                         message_item = send_queue.get(
+    #                             timeout=max(SHORT_TIMEOUT_INTERVAL - (time.time() - last_publish_time), 1))
+    #                         if message_item is None:
+    #                             program_is_alive = False
+    #                             break
+    #                     except queue.Empty:
+    #                         break
+
+    #                     validated_message_item = validate_queue_message(message_item)
+    #                     if validated_message_item is None:
+    #                         break
+    #                     topic_name, message_to_publish = validated_message_item
+
+    #         except Exception as error:
+    #             LOGGER.warning("Error: '{:s}' when trying to publish message.".format(str(error)))
+
+    @classmethod
+    def listener_thread(cls, connection_parameters, exchange_name, topic_names, callback_class):
         """The listener thread loop that listens to the given topic in the message bus and
            sends the received messages to the send function of the given callback class."""
         LOGGER.info("Opening listener thread for RabbitMQ client for the topics '{:s}'".format(", ".join(topic_names)))
-        asyncio.run(self.start_listen_connection(topic_names, callback_class))
+        asyncio.run(cls.start_listen_connection(connection_parameters, exchange_name, topic_names, callback_class))
         LOGGER.info("Closing listener thread for RabbitMQ client for the topics '{:s}'".format(", ".join(topic_names)))
 
-    async def start_listen_connection(self, topic_names, callback_class):
+    @classmethod
+    async def start_listen_connection(cls, connection_parameters, exchange_name, topic_names, callback_class):
         """The actual connection and topic listener function for the listener thread."""
         if isinstance(topic_names, str):
             topic_names = [topic_names]
 
-        rabbitmq_connection = await aio_pika.connect_robust(**self.__connection_parameters)
+        rabbitmq_connection = await aio_pika.connect_robust(**connection_parameters)
 
         async with rabbitmq_connection:
             rabbitmq_channel = await rabbitmq_connection.channel()
             rabbitmq_exchange = await rabbitmq_channel.declare_exchange(
-                self.__exchange_name, aio_pika.exchange.ExchangeType.TOPIC)
+                exchange_name, aio_pika.exchange.ExchangeType.TOPIC)
 
             # Declaring a queue; type: aio_pika.Queue
             # No name provided -> the server generates a random name
@@ -170,13 +266,13 @@ class RabbitmqClient:
             # Binding the queue to the given topics
             for topic_name in topic_names:
                 await rabbitmq_queue.bind(rabbitmq_exchange, routing_key=topic_name)
-                LOGGER.info("Now listening to messages; exc={:s}, topic={:s}".format(self.__exchange_name, topic_name))
+                LOGGER.info("Now listening to messages; exc={:s}, topic={:s}".format(exchange_name, topic_name))
 
             async with rabbitmq_queue.iterator() as queue_iter:
                 async for message in queue_iter:
                     async with message.process():
                         LOGGER.debug("Message '{:s}' received from topic: '{:s}'".format(
-                            message.body.decode(RabbitmqClient.MESSAGE_ENCODING), message.routing_key))
+                            message.body.decode(cls.MESSAGE_ENCODING), message.routing_key))
                         await callback_class.callback(message)
 
     @classmethod

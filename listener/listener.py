@@ -37,7 +37,7 @@ class ListenerComponent:
         """The component name in the simulation."""
         return self.__simulation_topics
 
-    def simulation_message_handler(self, message_object, message_routing_key):
+    async def simulation_message_handler(self, message_object, message_routing_key):
         """Handles the received simulation state messages."""
         if isinstance(message_object, AbstractMessage):
             if message_object.simulation_id != self.simulation_id:

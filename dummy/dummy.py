@@ -2,6 +2,7 @@
 
 """This module contains a dummy simulation component that has very simple internal logic."""
 
+import asyncio
 import queue
 import random
 import threading
@@ -72,24 +73,22 @@ class DummyComponent:
         """The component name in the simulation."""
         return self.__component_name
 
-    def stop(self):
+    async def stop(self):
         """Stops the component."""
         LOGGER.info("Stopping the component: '{:s}'".format(self.component_name))
-        self.simulation_state = DummyComponent.SIMULATION_STATE_VALUE_STOPPED
+        await self.set_simulation_state(DummyComponent.SIMULATION_STATE_VALUE_STOPPED)
 
-    @property
-    def simulation_state(self):
-        """Return the simulation state attribute."""
+    def get_simulation_state(self):
+        """Returns the simulation state attribute."""
         return self.__simulation_state
 
-    @simulation_state.setter
-    def simulation_state(self, new_simulation_state):
+    async def set_simulation_state(self, new_simulation_state):
         if new_simulation_state in SimulationStateMessage.SIMULATION_STATES:
             self.__simulation_state = new_simulation_state
 
             if new_simulation_state == DummyComponent.SIMULATION_STATE_VALUE_RUNNING:
                 if self.__latest_epoch == 0:
-                    self.__send_new_status_message()
+                    await self.__send_new_status_message()
 
             elif new_simulation_state == DummyComponent.SIMULATION_STATE_VALUE_STOPPED:
                 LOGGER.info("Component {:s} stopping in {:d} seconds.".format(
@@ -97,32 +96,32 @@ class DummyComponent:
                 time.sleep(TIMEOUT_INTERVAL)
                 self.__end_queue.put(None)
 
-    def start_epoch(self, epoch_number):
+    async def start_epoch(self, epoch_number):
         """Starts a new epoch for the component. Sends a status message when finished."""
         if self.__simulation_state == DummyComponent.SIMULATION_STATE_VALUE_RUNNING:
             self.__latest_epoch = epoch_number
 
             rand_error_change = random.random()
             if rand_error_change < self.__error_change:
-                self.__send_error_message("Bad error")
+                await self.__send_error_message("Bad error")
             else:
                 rand_wait_time = random.randint(self.__min_delay, self.__max_delay)
                 LOGGER.info("Component {:s} sending status message for epoch {:d} in {:d} seconds.".format(
                     self.__component_name, self.__latest_epoch, rand_wait_time))
                 time.sleep(rand_wait_time)
-                self.__send_new_status_message()
+                await self.__send_new_status_message()
 
-    def general_message_handler(self, message_object, message_routing_key):
+    async def general_message_handler(self, message_object, message_routing_key):
         """Forwards the message handling to the appropriate function depending on the message type."""
         if isinstance(message_object, SimulationStateMessage):
-            self.simulation_state_message_handler(message_object, message_routing_key)
+            await self.simulation_state_message_handler(message_object, message_routing_key)
         elif isinstance(message_object, EpochMessage):
-            self.epoch_message_handler(message_object, message_routing_key)
+            await self.epoch_message_handler(message_object, message_routing_key)
         else:
             LOGGER.warning("Received '{:s}' message when expecting for '{:s}' or '{:s}' message".format(
                 str(type(message_object)), str(SimulationStateMessage), str(EpochMessage)))
 
-    def simulation_state_message_handler(self, message_object, message_routing_key):
+    async def simulation_state_message_handler(self, message_object, message_routing_key):
         """Handles the received simulation state messages."""
         if message_object.simulation_id != self.simulation_id:
             LOGGER.info(
@@ -135,9 +134,9 @@ class DummyComponent:
         else:
             LOGGER.debug("Received a state message from {:s} on topic {:s}".format(
                 message_object.source_process_id, message_routing_key))
-            self.simulation_state = message_object.simulation_state
+            await self.set_simulation_state(message_object.simulation_state)
 
-    def epoch_message_handler(self, message_object, message_routing_key):
+    async def epoch_message_handler(self, message_object, message_routing_key):
         """Handles the received epoch messages."""
         if message_object.simulation_id != self.simulation_id:
             LOGGER.info(
@@ -150,15 +149,15 @@ class DummyComponent:
         else:
             LOGGER.debug("Received an epoch from {:s} on topic {:s}".format(
                 message_object.source_process_id, message_routing_key))
-            self.start_epoch(message_object.epoch_number)
+            await self.start_epoch(message_object.epoch_number)
 
-    def __send_new_status_message(self):
+    async def __send_new_status_message(self):
         new_status_message = self.__get_status_message()
-        self.__rabbitmq_client.send_message(self.__status_topic, new_status_message)
+        await self.__rabbitmq_client.send_message(self.__status_topic, new_status_message)
 
-    def __send_error_message(self, description):
+    async def __send_error_message(self, description):
         error_message = self.__get_error_message(description)
-        self.__rabbitmq_client.send_message(self.__error_topic, error_message)
+        await self.__rabbitmq_client.send_message(self.__error_topic, error_message)
 
     def __get_status_message(self):
         status_message = StatusMessage(**{
@@ -191,7 +190,7 @@ class DummyComponent:
         return error_message.bytes()
 
 
-def start_dummy_component():
+async def start_dummy_component():
     """Start a dummy component for the simulation platform."""
     env_variables = load_environmental_variables(
         (__SIMULATION_ID, str),
@@ -229,4 +228,4 @@ def start_dummy_component():
 
 
 if __name__ == "__main__":
-    start_dummy_component()
+    asyncio.run(start_dummy_component())
