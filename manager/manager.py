@@ -7,7 +7,7 @@ import queue
 import threading
 import time
 
-from tools.callbacks import StatusMessageCallback
+from tools.callbacks import GeneralMessageCallback
 from tools.clients import RabbitmqClient
 from tools.components import SimulationComponents
 from tools.datetime_tools import to_utc_datetime_object
@@ -64,9 +64,9 @@ class SimulationManager:
 
         self.__message_id_generator = get_next_message_id(self.manager_name)
 
-        self.__rabbitmq_client.add_listener(
+        self.__rabbitmq_client.add_listeners(
             self.__status_topic,
-            StatusMessageCallback(self.status_message_handler))
+            GeneralMessageCallback(self.status_message_handler))
 
     def start(self):
         """Starts the simulation. Sends a simulation state message."""

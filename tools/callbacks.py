@@ -7,6 +7,8 @@ import threading
 
 from tools.messages import AbstractMessage, AbstractResultMessage, EpochMessage, GeneralMessage, \
                            ResultMessage, SimulationStateMessage, StatusMessage
+from tools.messages import MESSAGE_TYPES as ALL_MESSAGE_TYPES, \
+                           DEFAULT_MESSAGE_TYPE as GENERAL_DEFAULT_MESSAGE_TYPE
 from tools.tools import FullLogger
 
 LOGGER = FullLogger(__name__)
@@ -18,37 +20,37 @@ class AbstractMessageCallback:
     DEFAULT_MESSAGE_TYPE = AbstractMessage
 
     def __init__(self, callback_function, message_type=None):
-        self.__lock = threading.Lock()
-        self.__callback_function = callback_function
+        self._lock = threading.Lock()
+        self._callback_function = callback_function
 
         if message_type is None:
-            self.__message_type = self.__class__.DEFAULT_MESSAGE_TYPE
+            self._message_type = self.__class__.DEFAULT_MESSAGE_TYPE
         else:
-            self.__message_type = message_type
+            self._message_type = message_type
 
-        self.__last_message = None
-        self.__last_topic = None
+        self._last_message = None
+        self._last_topic = None
 
     @property
     def last_message(self):
         """Returns the last message that was received."""
-        return self.__last_message
+        return self._last_message
 
     @property
     def last_topic(self):
         """Returns the topic from which the last message was received."""
-        return self.__last_topic
+        return self._last_topic
 
     def callback(self, message):
         """Callback function for the received messages."""
-        with self.__lock:
+        with self._lock:
             message_str = message.body.decode(AbstractMessageCallback.MESSAGE_CODING)
             message_json = json.loads(message_str)
-            message_object = self.__message_type.from_json(message_json)
+            message_object = self._message_type.from_json(message_json)
 
-            self.__last_message = message_object
-            self.__last_topic = message.routing_key
-            self.__callback_function(message_object, message.routing_key)
+            self.last_message = message_object
+            self.last_topic = message.routing_key
+            self._callback_function(message_object, message.routing_key)
 
             self.log_last_message()
 
@@ -56,12 +58,12 @@ class AbstractMessageCallback:
         """Writes a log message based on the last received message."""
         if isinstance(self.last_message, (AbstractResultMessage, ResultMessage)):
             LOGGER.info("Received '{:s}' message from '{:s}' for epoch {:d}".format(
-                self.__last_message.message_type,
-                self.__last_message.source_process_id,
-                self.__last_message.epoch_number))
+                self.last_message.message_type,
+                self.last_message.source_process_id,
+                self.last_message.epoch_number))
         elif isinstance(self.last_message, SimulationStateMessage):
             LOGGER.info("Received simulation state message '{:s}' from '{:s}'".format(
-                self.last_message.simulation_state, self.__last_message.source_process_id))
+                self.last_message.simulation_state, self._last_message.source_process_id))
         elif isinstance(self.last_message, EpochMessage):
             LOGGER.info("Epoch message received from '{:s}' for epoch number {:d} ({:s} - {:s})".format(
                 self.last_message.source_process_id,
@@ -111,3 +113,27 @@ class ResultMessageCallback(AbstractResultMessageCallback):
 class GeneralMessageCallback(AbstractMessageCallback):
     """The callback class for handling messages in GeneralMessage format."""
     DEFAULT_MESSAGE_TYPE = GeneralMessage
+
+    # def __init__(self, callback_function, message_type=None):
+    #     super().__init__(callback_function, message_type)
+    #     self.__lock = threading.Lock()
+
+    def callback(self, message):
+        """General allback function for the received messages."""
+        with self._lock:
+            message_str = message.body.decode(AbstractMessageCallback.MESSAGE_CODING)
+            message_json = json.loads(message_str)
+
+            # Convert the message to the specified special cases if possible.
+            actual_message_type = message_json.get(
+                next(iter(AbstractMessage.MESSAGE_ATTRIBUTES)),  # first attribute in the dict, i.e. "Type"
+                GENERAL_DEFAULT_MESSAGE_TYPE)
+            if actual_message_type not in ALL_MESSAGE_TYPES:
+                actual_message_type = GENERAL_DEFAULT_MESSAGE_TYPE
+            message_object = ALL_MESSAGE_TYPES[actual_message_type].from_json(message_json)
+
+            self._last_message = message_object
+            self._last_topic = message.routing_key
+            self._callback_function(message_object, message.routing_key)
+
+            self.log_last_message()

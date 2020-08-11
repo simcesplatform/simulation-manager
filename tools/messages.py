@@ -577,3 +577,14 @@ class GeneralMessage(AbstractMessage):
     def json(self):
         """Returns the message as a JSON object."""
         return {**get_json(self), **self.general_attributes}
+
+
+MESSAGE_TYPES = {
+    "SimState": SimulationStateMessage,
+    "Epoch": EpochMessage,
+    "Error": ErrorMessage,
+    "Status": StatusMessage,
+    "Result": ResultMessage,
+    "General": GeneralMessage
+}
+DEFAULT_MESSAGE_TYPE = "General"

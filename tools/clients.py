@@ -84,23 +84,27 @@ class RabbitmqClient:
            a list of (thread, callback class)-tuples as values."""
         return self.__listeners
 
-    def add_listener(self, topic_name, callback_class):
+    def add_listeners(self, topic_names, callback_class):
         """Adds a new listener to the given topic."""
+        if isinstance(topic_names, str):
+            topic_names = [topic_names]
+
         new_listener_thread = threading.Thread(
-            name="listen_thread_{:s}".format(topic_name),
+            name="listen_thread_{:s}".format(",".join(topic_names)),
             target=RabbitmqClient.listener_thread,
             daemon=True,
             kwargs={
                 "connection_parameters": self.__connection_parameters,
                 "exchange_name": self.__exchange_name,
-                "topic_name": topic_name,
+                "topic_names": topic_names,
                 "callback_class": callback_class
             })
 
         new_listener_thread.start()
-        if topic_name not in self.__listeners:
-            self.__listeners[topic_name] = []
-        self.__listeners[topic_name].append((new_listener_thread, callback_class))
+        for topic_name in topic_names:
+            if topic_name not in self.__listeners:
+                self.__listeners[topic_name] = []
+            self.__listeners[topic_name].append((new_listener_thread, callback_class))
 
     # def remove_listener(self, topic_name):
     #     """Removes all listeners from the given topic."""
@@ -143,16 +147,19 @@ class RabbitmqClient:
                     LOGGER.warning("Invalid message '{:s}' received in sender thread".format(message_item))
 
     @classmethod
-    def listener_thread(cls, connection_parameters, exchange_name, topic_name, callback_class):
+    def listener_thread(cls, connection_parameters, exchange_name, topic_names, callback_class):
         """The listener thread loop that listens to the given topic in the message bus and
            sends the received messages to the send function of the given callback class."""
-        LOGGER.info("Opening listener thread for RabbitMQ client for the topic '{:s}'".format(topic_name))
-        asyncio.run(cls.start_listen_connection(connection_parameters, exchange_name, topic_name, callback_class))
-        LOGGER.info("Closing listener thread for RabbitMQ client for the topic '{:s}'".format(topic_name))
+        LOGGER.info("Opening listener thread for RabbitMQ client for the topics '{:s}'".format(", ".join(topic_names)))
+        asyncio.run(cls.start_listen_connection(connection_parameters, exchange_name, topic_names, callback_class))
+        LOGGER.info("Closing listener thread for RabbitMQ client for the topics '{:s}'".format(", ".join(topic_names)))
 
     @classmethod
-    async def start_listen_connection(cls, connection_parameters, exchange_name, topic_name, callback_class):
+    async def start_listen_connection(cls, connection_parameters, exchange_name, topic_names, callback_class):
         """The actual connection and topic listener function for the listener thread."""
+        if isinstance(topic_names, str):
+            topic_names = [topic_names]
+
         rabbitmq_connection = await aio_pika.connect_robust(**connection_parameters)
 
         async with rabbitmq_connection:
@@ -167,9 +174,10 @@ class RabbitmqClient:
                 exclusive=True     # No other application can access the queue; delete on exit
             )
 
-            # Binding the queue
-            await rabbitmq_queue.bind(rabbitmq_exchange, routing_key=topic_name)
-            LOGGER.info("Now listening to messages; exc={:s}, topic={:s}".format(exchange_name, topic_name))
+            # Binding the queue to the given topics
+            for topic_name in topic_names:
+                await rabbitmq_queue.bind(rabbitmq_exchange, routing_key=topic_name)
+                LOGGER.info("Now listening to messages; exc={:s}, topic={:s}".format(exchange_name, topic_name))
 
             async with rabbitmq_queue.iterator() as queue_iter:
                 async for message in queue_iter:

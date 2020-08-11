@@ -7,7 +7,7 @@ import random
 import threading
 import time
 
-from tools.callbacks import EpochMessageCallback, SimulationStateMessageCallback
+from tools.callbacks import GeneralMessageCallback
 from tools.clients import RabbitmqClient
 from tools.messages import EpochMessage, StatusMessage, SimulationStateMessage, get_next_message_id
 from tools.tools import FullLogger, load_environmental_variables
@@ -51,13 +51,12 @@ class DummyComponent:
         self.__end_queue = end_queue
         self.__message_id_generator = get_next_message_id(component_name)
 
-        self.__rabbitmq_client.add_listener(
-            self.__simulation_state_topic,
-            SimulationStateMessageCallback(self.simulation_state_message_handler))
-
-        self.__rabbitmq_client.add_listener(
-            self.__epoch_topic,
-            EpochMessageCallback(self.epoch_message_handler))
+        self.__rabbitmq_client.add_listeners(
+            [
+                self.__simulation_state_topic,
+                self.__epoch_topic
+            ],
+            GeneralMessageCallback(self.general_message_handler))
 
     @property
     def simulation_id(self):
@@ -100,43 +99,45 @@ class DummyComponent:
             time.sleep(rand_wait_time)
             self.__send_new_status_message()
 
+    def general_message_handler(self, message_object, message_routing_key):
+        """Forwards the message handling to the appropriate function depending on the message type."""
+        if isinstance(message_object, SimulationStateMessage):
+            self.simulation_state_message_handler(message_object, message_routing_key)
+        elif isinstance(message_object, EpochMessage):
+            self.epoch_message_handler(message_object, message_routing_key)
+        else:
+            LOGGER.warning("Received '{:s}' message when expecting for '{:s}' or '{:s}' message".format(
+                str(type(message_object)), str(SimulationStateMessage), str(EpochMessage)))
+
     def simulation_state_message_handler(self, message_object, message_routing_key):
         """Handles the received simulation state messages."""
-        if isinstance(message_object, SimulationStateMessage):
-            if message_object.simulation_id != self.simulation_id:
-                LOGGER.info(
-                    "Received state message for a different simulation: '{:s}' instead of '{:s}'".format(
-                        message_object.simulation_id, self.simulation_id))
-            elif message_object.message_type != SimulationStateMessage.CLASS_MESSAGE_TYPE:
-                LOGGER.info(
-                    "Received a state message with wrong message type: '{:s}' instead of '{:s}'".format(
-                        message_object.message_type, SimulationStateMessage.CLASS_MESSAGE_TYPE))
-            else:
-                LOGGER.debug("Received a state message from {:s} on topic {:s}".format(
-                    message_object.source_process_id, message_routing_key))
-                self.simulation_state = message_object.simulation_state
+        if message_object.simulation_id != self.simulation_id:
+            LOGGER.info(
+                "Received state message for a different simulation: '{:s}' instead of '{:s}'".format(
+                    message_object.simulation_id, self.simulation_id))
+        elif message_object.message_type != SimulationStateMessage.CLASS_MESSAGE_TYPE:
+            LOGGER.info(
+                "Received a state message with wrong message type: '{:s}' instead of '{:s}'".format(
+                    message_object.message_type, SimulationStateMessage.CLASS_MESSAGE_TYPE))
         else:
-            LOGGER.warning("Received '{:s}' message when expecting for '{:s}' message".format(
-                str(type(message_object)), str(SimulationStateMessage)))
+            LOGGER.debug("Received a state message from {:s} on topic {:s}".format(
+                message_object.source_process_id, message_routing_key))
+            self.simulation_state = message_object.simulation_state
 
     def epoch_message_handler(self, message_object, message_routing_key):
         """Handles the received epoch messages."""
-        if isinstance(message_object, EpochMessage):
-            if message_object.simulation_id != self.simulation_id:
-                LOGGER.info(
-                    "Received epoch message for a different simulation: '{:s}' instead of '{:s}'".format(
-                        message_object.simulation_id, self.simulation_id))
-            elif message_object.message_type != EpochMessage.CLASS_MESSAGE_TYPE:
-                LOGGER.info(
-                    "Received a epoch message with wrong message type: '{:s}' instead of '{:s}'".format(
-                        message_object.message_type, EpochMessage.CLASS_MESSAGE_TYPE))
-            else:
-                LOGGER.debug("Received an epoch from {:s} on topic {:s}".format(
-                    message_object.source_process_id, message_routing_key))
-                self.start_epoch(message_object.epoch_number)
+        if message_object.simulation_id != self.simulation_id:
+            LOGGER.info(
+                "Received epoch message for a different simulation: '{:s}' instead of '{:s}'".format(
+                    message_object.simulation_id, self.simulation_id))
+        elif message_object.message_type != EpochMessage.CLASS_MESSAGE_TYPE:
+            LOGGER.info(
+                "Received a epoch message with wrong message type: '{:s}' instead of '{:s}'".format(
+                    message_object.message_type, EpochMessage.CLASS_MESSAGE_TYPE))
         else:
-            LOGGER.warning("Received '{:s}' message when expecting for '{:s}' message".format(
-                str(type(message_object)), str(EpochMessage)))
+            LOGGER.debug("Received an epoch from {:s} on topic {:s}".format(
+                message_object.source_process_id, message_routing_key))
+            self.start_epoch(message_object.epoch_number)
 
     def __send_new_status_message(self):
         new_status_message = self.__get_status_message()

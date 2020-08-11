@@ -8,7 +8,7 @@ import time
 
 from tools.callbacks import GeneralMessageCallback
 from tools.clients import RabbitmqClient
-from tools.messages import GeneralMessage, SimulationStateMessage
+from tools.messages import AbstractMessage, SimulationStateMessage
 from tools.tools import FullLogger, load_environmental_variables
 
 LOGGER = FullLogger(__name__)
@@ -25,7 +25,7 @@ class ListenerComponent:
         self.__simulation_id = simulation_id
         self.__end_queue = end_queue
 
-        self.__rabbitmq_client.add_listener("#", GeneralMessageCallback(self.simulation_message_handler))
+        self.__rabbitmq_client.add_listeners("#", GeneralMessageCallback(self.simulation_message_handler))
 
     @property
     def simulation_id(self):
@@ -39,7 +39,7 @@ class ListenerComponent:
 
     def simulation_message_handler(self, message_object, message_routing_key):
         """Handles the received simulation state messages."""
-        if isinstance(message_object, GeneralMessage):
+        if isinstance(message_object, AbstractMessage):
             if message_object.simulation_id != self.simulation_id:
                 LOGGER.info(
                     "Received state message for a different simulation: '{:s}' instead of '{:s}'".format(
@@ -48,16 +48,15 @@ class ListenerComponent:
                 LOGGER.debug("{:s} : {:s}".format(message_routing_key, str(message_object.json())))
 
                 # Check if the message is simulation ending message.
-                if (message_object.message_type == SimulationStateMessage.CLASS_MESSAGE_TYPE and
-                        message_object.json().get(list(SimulationStateMessage.MESSAGE_ATTRIBUTES.keys())[0], "") ==
-                        SimulationStateMessage.SIMULATION_STATES[-1]):
+                if (isinstance(message_object, SimulationStateMessage) and
+                        message_object.simulation_state == SimulationStateMessage.SIMULATION_STATES[-1]):
                     LOGGER.info("Listener stopping in {:d} seconds.".format(TIMEOUT_INTERVAL))
                     time.sleep(TIMEOUT_INTERVAL)
                     self.__end_queue.put(None)
 
         else:
             LOGGER.warning("Received '{:s}' message when expecting for '{:s}' message".format(
-                str(type(message_object)), str(GeneralMessage)))
+                str(type(message_object)), str(AbstractMessage)))
 
 
 def start_listener_component():
