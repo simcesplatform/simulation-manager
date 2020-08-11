@@ -57,7 +57,7 @@ class AbstractMessage():
     MESSAGE_ENCODING = "UTF-8"
     CLASS_MESSAGE_TYPE = ""
 
-    MESSAGE_TYPES = ["SimState", "Epoch", "Error", "Status", "Result"]
+    MESSAGE_TYPES = ["SimState", "Epoch", "Error", "Status", "Result", "General"]
     # The relationships between the JSON attributes and the object properties
     MESSAGE_ATTRIBUTES = {
         "Type": "message_type",
@@ -528,3 +528,52 @@ class ResultMessage(AbstractResultMessage):
     def json(self):
         """Returns the message as a JSON object."""
         return {**get_json(self), **self.result_values}
+
+
+class GeneralMessage(AbstractMessage):
+    """Class for a generic message containing at least all the required attributes from AbstractMessage.
+       Useful when making general use message listeners."""
+    CLASS_MESSAGE_TYPE = "General"
+
+    MESSAGE_ATTRIBUTES = {}
+    OPTIONAL_ATTRIBUTES = []
+
+    MESSAGE_ATTRIBUTES_FULL = {
+        **AbstractMessage.MESSAGE_ATTRIBUTES_FULL,
+        **MESSAGE_ATTRIBUTES
+    }
+    OPTIONAL_ATTRIBUTES_FULL = AbstractMessage.OPTIONAL_ATTRIBUTES_FULL + OPTIONAL_ATTRIBUTES
+
+    def __init__(self, **kwargs):
+        """All the given attributes are considered."""
+        super().__init__(**kwargs)
+        for json_attribute_name in GeneralMessage.MESSAGE_ATTRIBUTES:
+            setattr(self, GeneralMessage.MESSAGE_ATTRIBUTES[json_attribute_name],
+                    kwargs.get(json_attribute_name, None))
+
+        self.general_attributes = {
+            general_attribute_name: general_attribute_value
+            for general_attribute_name, general_attribute_value in kwargs.items()
+            if general_attribute_name not in self.__class__.MESSAGE_ATTRIBUTES_FULL
+        }
+
+    @property
+    def general_attributes(self):
+        """A dictionary containing all the optional attributes."""
+        return self.__general_attributes
+
+    @general_attributes.setter
+    def general_attributes(self, general_attributes):
+        if not self._check_general_attributes(general_attributes):
+            raise MessageValueError("'{:s}' is an invalid general attribute dictionary".format(
+                str(general_attributes)))
+
+        self.__general_attributes = general_attributes
+
+    @classmethod
+    def _check_general_attributes(cls, general_attributes):
+        return isinstance(general_attributes, dict)
+
+    def json(self):
+        """Returns the message as a JSON object."""
+        return {**get_json(self), **self.general_attributes}

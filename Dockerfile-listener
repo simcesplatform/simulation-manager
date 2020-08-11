@@ -1,0 +1,16 @@
+FROM python:3.7.3
+
+RUN mkdir -p /listener
+RUN mkdir -p /tools
+RUN mkdir -p /logs
+
+COPY requirements.txt /requirements.txt
+RUN pip install --upgrade pip
+RUN pip install -r /requirements.txt
+
+COPY listener/ /listener/
+COPY tools/ /tools/
+
+WORKDIR /
+
+CMD [ "python3", "-u", "-m", "listener.listener" ]

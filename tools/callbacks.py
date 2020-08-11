@@ -5,7 +5,7 @@
 import json
 import threading
 
-from tools.messages import AbstractMessage, AbstractResultMessage, EpochMessage, \
+from tools.messages import AbstractMessage, AbstractResultMessage, EpochMessage, GeneralMessage, \
                            ResultMessage, SimulationStateMessage, StatusMessage
 from tools.tools import FullLogger
 
@@ -25,12 +25,19 @@ class AbstractMessageCallback:
             self.__message_type = self.__class__.DEFAULT_MESSAGE_TYPE
         else:
             self.__message_type = message_type
+
         self.__last_message = None
+        self.__last_topic = None
 
     @property
     def last_message(self):
         """Returns the last message that was received."""
         return self.__last_message
+
+    @property
+    def last_topic(self):
+        """Returns the topic from which the last message was received."""
+        return self.__last_topic
 
     def callback(self, message):
         """Callback function for the received messages."""
@@ -40,38 +47,40 @@ class AbstractMessageCallback:
             message_object = self.__message_type.from_json(message_json)
 
             self.__last_message = message_object
+            self.__last_topic = message.routing_key
             self.__callback_function(message_object, message.routing_key)
 
             self.log_last_message()
 
     def log_last_message(self):
         """Writes a log message based on the last received message."""
-        if isinstance(self.__last_message, (AbstractResultMessage, ResultMessage)):
+        if isinstance(self.last_message, (AbstractResultMessage, ResultMessage)):
             LOGGER.info("Received '{:s}' message from '{:s}' for epoch {:d}".format(
                 self.__last_message.message_type,
                 self.__last_message.source_process_id,
                 self.__last_message.epoch_number))
-        elif isinstance(self.__last_message, SimulationStateMessage):
+        elif isinstance(self.last_message, SimulationStateMessage):
             LOGGER.info("Received simulation state message '{:s}' from '{:s}'".format(
-                self.__last_message.simulation_state, self.__last_message.source_process_id))
-        elif isinstance(self.__last_message, EpochMessage):
+                self.last_message.simulation_state, self.__last_message.source_process_id))
+        elif isinstance(self.last_message, EpochMessage):
             LOGGER.info("Epoch message received from '{:s}' for epoch number {:d} ({:s} - {:s})".format(
-                self.__last_message.source_process_id,
-                self.__last_message.epoch_number,
-                self.__last_message.start_time,
-                self.__last_message.end_time))
-        elif isinstance(self.__last_message, StatusMessage):
+                self.last_message.source_process_id,
+                self.last_message.epoch_number,
+                self.last_message.start_time,
+                self.last_message.end_time))
+        elif isinstance(self.last_message, StatusMessage):
             LOGGER.info("Status message received from '{:s}' for epoch number {:d}".format(
-                self.__last_message.source_process_id,
-                self.__last_message.epoch_number))
-        elif isinstance(self.__last_message, AbstractMessage):
-            LOGGER.info("Received '{:s}' message from '{:s}'".format(
-                self.__last_message.message_type,
-                self.__last_message.source_process_id))
-        elif self.__last_message is None:
+                self.last_message.source_process_id,
+                self.last_message.epoch_number))
+        elif isinstance(self.last_message, AbstractMessage):
+            LOGGER.info("Received '{:s}' message from '{:s}' on topic '{:s}'".format(
+                self.last_message.message_type,
+                self.last_message.source_process_id,
+                self.last_topic))
+        elif self.last_message is None:
             LOGGER.warning("No last message found.")
         else:
-            LOGGER.warning("The last message is of unknown type: {:s}".format(type(self.__last_message)))
+            LOGGER.warning("The last message is of unknown type: {:s}".format(type(self.last_message)))
 
 
 class SimulationStateMessageCallback(AbstractMessageCallback):
@@ -92,3 +101,13 @@ class EpochMessageCallback(AbstractResultMessageCallback):
 class StatusMessageCallback(AbstractResultMessageCallback):
     """The callback class for handling messages in StatusMessage format."""
     DEFAULT_MESSAGE_TYPE = StatusMessage
+
+
+class ResultMessageCallback(AbstractResultMessageCallback):
+    """The callback class for handling messages in ResultMessage format."""
+    DEFAULT_MESSAGE_TYPE = ResultMessage
+
+
+class GeneralMessageCallback(AbstractMessageCallback):
+    """The callback class for handling messages in GeneralMessage format."""
+    DEFAULT_MESSAGE_TYPE = GeneralMessage

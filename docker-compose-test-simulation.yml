@@ -10,8 +10,8 @@ services:
     container_name: simulation_manager
     restart: "no"
     env_file:
-      - common.env
-      - simulation_manager.env
+      - env/common.env
+      - env/simulation_manager.env
     volumes:
       - simulation_logs:/logs
     networks:
@@ -25,8 +25,8 @@ services:
     container_name: dummy_component_1
     restart: "no"
     env_file:
-      - common.env
-      - dummy.env
+      - env/common.env
+      - env/dummy.env
     environment:
       - SIMULATION_COMPONENT_NAME=dummy_component_1
       - SIMULATION_LOG_FILE=logs/logfile_dummy1.log
@@ -43,8 +43,8 @@ services:
     container_name: dummy_component_2
     restart: "no"
     env_file:
-      - common.env
-      - dummy.env
+      - env/common.env
+      - env/dummy.env
     environment:
       - SIMULATION_COMPONENT_NAME=dummy_component_2
       - SIMULATION_LOG_FILE=logs/logfile_dummy2.log
@@ -61,11 +61,26 @@ services:
     container_name: dummy_component_3
     restart: "no"
     env_file:
-      - common.env
-      - dummy.env
+      - env/common.env
+      - env/dummy.env
     environment:
       - SIMULATION_COMPONENT_NAME=dummy_component_3
       - SIMULATION_LOG_FILE=logs/logfile_dummy3.log
+    volumes:
+      - simulation_logs:/logs
+    networks:
+     - rabbitmq_network
+
+  listener:
+    build:
+      context: .
+      dockerfile: Dockerfile-listener
+    image: listener:0.1
+    container_name: listener_component
+    restart: "no"
+    env_file:
+      - env/common.env
+      - env/listener.env
     volumes:
       - simulation_logs:/logs
     networks:
