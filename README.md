@@ -23,3 +23,9 @@ docker-compose -f docker-compose-test-simulation.yml up --build
 ```bash
 docker-compose -f docker_tests/docker-compose-tests.yml up --build
 ```
+
+## Stop local RabbitMQ server
+
+```bash
+docker-compose -f rabbitmq\docker-compose-rabbitmq.yml down --remove-orphans
+```
