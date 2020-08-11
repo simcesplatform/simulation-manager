@@ -42,20 +42,20 @@ class SimulationComponents():
         """Registers a new ready message for the given component and epoch number."""
         if component_name not in self.__components:
             LOGGER.warning("%s was not found in the simulation component list", component_name)
-        elif epoch_number < 1:
+        elif epoch_number < 0:
             LOGGER.warning("%d is not acceptable epoch number", epoch_number)
         elif epoch_number <= self.__components[component_name]:
             LOGGER.warning("%d is not larger epoch number than the previous %d",
-                                epoch_number, self.__components[component_name])
+                           epoch_number, self.__components[component_name])
         else:
             if (epoch_number != self.__components[component_name] + 1 and
                     self.__components[component_name] != SimulationComponents.NO_MESSAGES):
                 LOGGER.warning("%d is not the next epoch, previous was %d",
-                                    epoch_number, self.__components[component_name])
+                               epoch_number, self.__components[component_name])
             self.__components[component_name] = epoch_number
             self._update_latest_full_epoch()
             LOGGER.debug("Ready message for epoch %d from component %s registered.",
-                             epoch_number, component_name)
+                         epoch_number, component_name)
 
     def get_component_list(self, latest_epoch_less_than=None):
         """Returns a list of the registered simulation components."""

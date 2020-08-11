@@ -105,8 +105,7 @@ COMMON_ENV_VARIABLES = load_environmental_variables(
         "%(levelname)s",
         "%(name)s",
         "%(funcName)s",
-        "%(message)s"])
-    )
+        "%(message)s"]))
 )
 
 
@@ -141,7 +140,11 @@ class FullLogger:
 
     def __print(self, message_level, message, *args):
         if self.__log_level <= message_level:
-            print(FullLogger.MESSAGE_LEVEL[message_level], ":", message % args, flush=True)
+            print(
+                datetime.datetime.now().isoformat(),
+                FullLogger.MESSAGE_LEVEL[message_level], ":", message % args,
+                flush=True)
+
 
 def get_logger(logger_name):
     """Returns a logger object."""

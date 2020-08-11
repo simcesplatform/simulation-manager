@@ -47,6 +47,7 @@ class RabbitmqClient:
     """RabbitMQ client that can be used to send messages and to create topic listeners."""
     DEFAULT_ENV_VARIABLE_PREFIX = "RABBITMQ_"
     CONNECTION_PARAMTERS = ["host", "port", "login", "password", "ssl"]
+    OPTIONAL_SSL_PARAMETER_TOP = "ssl_options"
     OPTIONAL_SSL_PARAMETER = "ssl_version"
     MESSAGE_ENCODING = "UTF-8"
 
@@ -186,7 +187,7 @@ class RabbitmqClient:
             if config_parameter in cls.CONNECTION_PARAMTERS
         }
         if stripped_connection_config["ssl"]:
-            stripped_connection_config[cls.OPTIONAL_SSL_PARAMETER] = {
+            stripped_connection_config[cls.OPTIONAL_SSL_PARAMETER_TOP] = {
                 cls.OPTIONAL_SSL_PARAMETER: connection_config_dict[cls.OPTIONAL_SSL_PARAMETER]
             }
 
