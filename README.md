@@ -18,10 +18,25 @@ Edit the files [`common.env`](common.env), [`simulation_manager.env`](simulation
 docker-compose -f docker-compose-test-simulation.yml up --build
 ```
 
+Or to just see all the messages in the message bus:
+
+```bash
+docker-compose -f docker_tests/docker-compose-listener.yml up --build --detach
+docker-compose -f docker-compose-test-simulation.yml up --build --detach
+docker attach listener_component
+```
+
 ## Run unit tests
 
 ```bash
 docker-compose -f docker_tests/docker-compose-tests.yml up --build
+```
+
+## Stop running simulation
+
+```bash
+docker-compose -f docker_tests/docker-compose-listener.yml down --remove-orphans
+docker-compose -f docker-compose-test-simulation.yml down --remove-orphans
 ```
 
 ## Stop local RabbitMQ server
