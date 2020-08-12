@@ -52,6 +52,7 @@ class DummyComponent:
 
         self.__simulation_state = DummyComponent.SIMULATION_STATE_VALUE_STOPPED
         self.__latest_epoch = 0
+        self.__completed_epoch = 0
 
         self.__end_queue = end_queue
         self.__message_id_generator = get_next_message_id(component_name)
@@ -101,6 +102,12 @@ class DummyComponent:
         if self.__simulation_state == DummyComponent.SIMULATION_STATE_VALUE_RUNNING:
             self.__latest_epoch = epoch_number
 
+            # If the epoch is already completed, send a new status message immediately.
+            if self.__completed_epoch == epoch_number:
+                LOGGER.debug("Resending status message for epoch {:d}".format(epoch_number))
+                await self.__send_new_status_message()
+                return
+
             rand_error_change = random.random()
             if rand_error_change < self.__error_change:
                 await self.__send_error_message("Bad error")
@@ -109,7 +116,7 @@ class DummyComponent:
                 LOGGER.info("Component {:s} sending status message for epoch {:d} in {:d} seconds.".format(
                     self.__component_name, self.__latest_epoch, rand_wait_time))
                 time.sleep(rand_wait_time)
-                await self.__send_new_status_message()
+            await self.__send_new_status_message()
 
     async def general_message_handler(self, message_object, message_routing_key):
         """Forwards the message handling to the appropriate function depending on the message type."""
@@ -154,6 +161,7 @@ class DummyComponent:
     async def __send_new_status_message(self):
         new_status_message = self.__get_status_message()
         await self.__rabbitmq_client.send_message(self.__status_topic, new_status_message)
+        self.__completed_epoch = self.__latest_epoch
 
     async def __send_error_message(self, description):
         error_message = self.__get_error_message(description)

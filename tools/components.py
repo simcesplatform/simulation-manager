@@ -45,8 +45,8 @@ class SimulationComponents():
         elif epoch_number < 0:
             LOGGER.warning("%d is not acceptable epoch number", epoch_number)
         elif epoch_number <= self.__components[component_name]:
-            LOGGER.warning("%d is not larger epoch number than the previous %d",
-                           epoch_number, self.__components[component_name])
+            LOGGER.debug("Epoch %d for %s is not larger epoch number than the previous %d",
+                         epoch_number, component_name, self.__components[component_name])
         else:
             if (epoch_number != self.__components[component_name] + 1 and
                     self.__components[component_name] != SimulationComponents.NO_MESSAGES):

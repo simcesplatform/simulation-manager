@@ -13,11 +13,13 @@ from tools.clients import RabbitmqClient
 from tools.components import SimulationComponents
 from tools.datetime_tools import to_utc_datetime_object
 from tools.messages import EpochMessage, ErrorMessage, StatusMessage, SimulationStateMessage, get_next_message_id
+from tools.timer import Timer
 from tools.tools import FullLogger, load_environmental_variables
 
 LOGGER = FullLogger(__name__)
 
 TIMEOUT_INTERVAL = 15
+EPOCH_TIMER_INTERVAL = 90
 
 __SIMULATION_ID = "SIMULATION_ID"
 __SIMULATION_MANAGER_NAME = "SIMULATION_MANAGER_NAME"
@@ -54,6 +56,7 @@ class SimulationManager:
         self.__epoch_number = 0
         self.__epoch_length = epoch_length
         self.__max_epochs = max_epochs
+        self.__epoch_timer = None
 
         self.__current_start_time = to_utc_datetime_object(initial_start_time)
         self.__current_end_time = None
@@ -81,6 +84,9 @@ class SimulationManager:
     async def stop(self):
         """Stops the simulation. Sends a simulation state message to the message bus."""
         LOGGER.info("Stopping the simulation.")
+        if self.__epoch_timer is not None:
+            self.__epoch_timer.cancel()
+            self.__epoch_timer = None
         await self.set_simulation_state(SimulationManager.SIMULATION_STATE_VALUE_STOPPED)
 
     @property
@@ -135,6 +141,7 @@ class SimulationManager:
 
         new_simulation_state_message = self.__get_simulation_state_message()
         await self.__rabbitmq_client.send_message(self.__state_topic, new_simulation_state_message)
+        self.__epoch_timer = Timer(EPOCH_TIMER_INTERVAL, self.__epoch_timer_handler)
 
     async def general_message_handler(self, message_object, message_routing_key):
         """Forwards the message handling to the appropriate function depending on the message type."""
@@ -182,6 +189,10 @@ class SimulationManager:
             await self.stop()
 
     async def __send_epoch_message(self, new_epoch=True):
+        if self.__epoch_timer is not None:
+            self.__epoch_timer.cancel()
+            self.__epoch_timer = None
+
         if new_epoch or self.epoch_number == 0:
             self.__epoch_number += 1
             if self.__current_end_time is not None:
@@ -191,8 +202,12 @@ class SimulationManager:
         if self.epoch_number <= self.max_epochs:
             new_epoch_message = self.__get_epoch_message(EpochMessage.CLASS_MESSAGE_TYPE)
             await self.__rabbitmq_client.send_message(self.__epoch_topic, new_epoch_message)
+            self.__epoch_timer = Timer(EPOCH_TIMER_INTERVAL, self.__epoch_timer_handler)
 
-            LOGGER.info("Starting epoch {:d}".format(self.__epoch_number))
+            if new_epoch:
+                LOGGER.info("Starting epoch {:d}".format(self.__epoch_number))
+            else:
+                LOGGER.info("Resending epoch message for epoch {:d}".format(self.__epoch_number))
 
         else:
             await self.stop()
@@ -227,6 +242,17 @@ class SimulationManager:
             LOGGER.error("Problem with creating a epoch message")
 
         return epoch_message.bytes()
+
+    async def __epoch_timer_handler(self):
+        """This is launched if the components in the simulation have not responded to the manager
+        within EPOCH_TIMER_INTERVAL seconds.
+        The function resends the epoch message for the current epoch,
+        or the simulation state message at the beginning of the simulation."""
+        if self.get_simulation_state() == SimulationManager.SIMULATION_STATE_VALUE_RUNNING:
+            if self.epoch_number > 0:
+                await self.__send_epoch_message(new_epoch=False)
+            else:
+                await self.send_state_message()
 
 
 async def start_manager():
