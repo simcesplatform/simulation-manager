@@ -6,7 +6,6 @@ import asyncio
 import queue
 import random
 import threading
-import time
 
 from tools.callbacks import GeneralMessageCallback
 from tools.clients import RabbitmqClient
@@ -94,7 +93,7 @@ class DummyComponent:
             elif new_simulation_state == DummyComponent.SIMULATION_STATE_VALUE_STOPPED:
                 LOGGER.info("Component {:s} stopping in {:d} seconds.".format(
                     self.__component_name, TIMEOUT_INTERVAL))
-                time.sleep(TIMEOUT_INTERVAL)
+                await asyncio.sleep(TIMEOUT_INTERVAL)
                 self.__end_queue.put(None)
 
     async def start_epoch(self, epoch_number):
@@ -115,7 +114,7 @@ class DummyComponent:
                 rand_wait_time = random.randint(self.__min_delay, self.__max_delay)
                 LOGGER.info("Component {:s} sending status message for epoch {:d} in {:d} seconds.".format(
                     self.__component_name, self.__latest_epoch, rand_wait_time))
-                time.sleep(rand_wait_time)
+                await asyncio.sleep(rand_wait_time)
             await self.__send_new_status_message()
 
     async def general_message_handler(self, message_object, message_routing_key):

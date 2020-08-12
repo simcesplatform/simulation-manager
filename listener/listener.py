@@ -2,9 +2,8 @@
 
 """This module contains a listener simulation component that prints out all messages from the message bus."""
 
+import asyncio
 import queue
-# import threading
-import time
 
 from tools.callbacks import GeneralMessageCallback
 from tools.clients import RabbitmqClient
@@ -51,7 +50,7 @@ class ListenerComponent:
                 if (isinstance(message_object, SimulationStateMessage) and
                         message_object.simulation_state == SimulationStateMessage.SIMULATION_STATES[-1]):
                     LOGGER.info("Listener stopping in {:d} seconds.".format(TIMEOUT_INTERVAL))
-                    time.sleep(TIMEOUT_INTERVAL)
+                    await asyncio.sleep(TIMEOUT_INTERVAL)
                     self.__end_queue.put(None)
 
         else:

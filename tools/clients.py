@@ -124,10 +124,10 @@ class RabbitmqClient:
     async def send_message(self, topic_name, message_bytes):
         """Sends the given message to the given topic. Assumes that the message is in bytes format."""
         # self.__send_queue.put((topic_name, message_bytes))
-        publish_message_task = asyncio.create_task(self.send_task(topic_name, message_bytes))
+        publish_message_task = asyncio.create_task(self.send_message_task(topic_name, message_bytes))
         await asyncio.wait([publish_message_task])
 
-    async def send_task(self, topic_name, message_to_publish):
+    async def send_message_task(self, topic_name, message_to_publish):
         """Publishes the given message to the given topic."""
         topic_name, message_to_publish = validate_message(topic_name, message_to_publish)
         if topic_name is None or message_to_publish is None:

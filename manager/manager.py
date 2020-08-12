@@ -6,7 +6,6 @@ import asyncio
 import datetime
 import queue
 import threading
-import time
 
 from tools.callbacks import GeneralMessageCallback
 from tools.clients import RabbitmqClient
@@ -19,7 +18,7 @@ from tools.tools import FullLogger, load_environmental_variables
 LOGGER = FullLogger(__name__)
 
 TIMEOUT_INTERVAL = 15
-EPOCH_TIMER_INTERVAL = 90
+EPOCH_TIMER_INTERVAL = 120
 
 __SIMULATION_ID = "SIMULATION_ID"
 __SIMULATION_MANAGER_NAME = "SIMULATION_MANAGER_NAME"
@@ -123,7 +122,7 @@ class SimulationManager:
             if new_simulation_state == SimulationManager.SIMULATION_STATE_VALUE_STOPPED:
                 LOGGER.info("Simulation manager '{:s}' stopping in {:d} seconds.".format(
                     self.__manager_name, TIMEOUT_INTERVAL))
-                time.sleep(TIMEOUT_INTERVAL)
+                await asyncio.sleep(TIMEOUT_INTERVAL)
                 self.__end_queue.put(None)
 
     async def check_components(self):
@@ -292,7 +291,7 @@ async def start_manager():
         end_queue)
 
     # wait a bit to allow other components to initialize and then start the simulation
-    time.sleep(TIMEOUT_INTERVAL)
+    await asyncio.sleep(TIMEOUT_INTERVAL)
     await manager.start()
 
     while True:
