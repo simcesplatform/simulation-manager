@@ -11,9 +11,11 @@ class SimulationComponents():
     """Keeps a list of components for the simulation and the latest epoch number
        for which a ready message was received from the component."""
     NO_MESSAGES = -1
+    MISSING_MESSAGE_ID = ""
 
     def __init__(self):
         self.__components = {}
+        self.__latest_status_message_ids = []
         LOGGER.debug("New SimulationComponents object created.")
 
         # invariant: self.__latest_full_epoch <= for all self.__components[component_value]
@@ -24,38 +26,47 @@ class SimulationComponents():
            If the given component_name is already in the list, the function prints an error message."""
         if component_name not in self.__components:
             self.__components[component_name] = SimulationComponents.NO_MESSAGES
-            LOGGER.info("Component: %s registered to SimulationComponents.", component_name)
+            LOGGER.info("Component: {:s} registered to SimulationComponents.".format(component_name))
         else:
-            LOGGER.warning("%s is already registered to the simulation component list", component_name)
+            LOGGER.warning("{:s} is already registered to the simulation component list".format(component_name))
 
     def remove_component(self, component_name: str):
         """Removes the given component from the simulation component list.
            If the given component_name is not found in the list, the function prints an error message."""
-        if self.__components.pop(component_name, None) is None:
-            LOGGER.warning("%s was not found in the simulation component list", component_name)
+        if (self.__components.pop(component_name, None) is None or
+                self.__last_status_message_ids.pop(component_name, None) is None):
+            LOGGER.warning("{:s} was not found in the simulation component list".format(component_name))
         else:
-            LOGGER.info("Component: %s removed from SimulationComponents.", component_name)
+            LOGGER.info("Component: {:s} removed from SimulationComponents.".format(component_name))
 
         self._update_latest_full_epoch()
 
-    def register_ready_message(self, component_name: str, epoch_number: int):
+    def register_ready_message(self, component_name: str, epoch_number: int, status_message_id: str):
         """Registers a new ready message for the given component and epoch number."""
         if component_name not in self.__components:
-            LOGGER.warning("%s was not found in the simulation component list", component_name)
+            LOGGER.warning("{:s} was not found in the simulation component list".format(component_name))
         elif epoch_number < 0:
-            LOGGER.warning("%d is not acceptable epoch number", epoch_number)
+            LOGGER.warning("{:d} is not acceptable epoch number".format(epoch_number))
         elif epoch_number <= self.__components[component_name]:
-            LOGGER.debug("Epoch %d for %s is not larger epoch number than the previous %d",
-                         epoch_number, component_name, self.__components[component_name])
+            LOGGER.debug("Epoch {:d} for {:s} is not larger epoch number than the previous {:d}".format(
+                epoch_number, component_name, self.__components[component_name]))
         else:
             if (epoch_number != self.__components[component_name] + 1 and
                     self.__components[component_name] != SimulationComponents.NO_MESSAGES):
-                LOGGER.warning("%d is not the next epoch, previous was %d",
-                               epoch_number, self.__components[component_name])
+                LOGGER.warning("{:d} is not the next epoch, previous was {:d}".format(
+                    epoch_number, self.__components[component_name]))
+            if not status_message_id:
+                LOGGER.warning("Status message id should not be empty.")
+
+            if max(self.__components.values()) < epoch_number:
+                self.__latest_status_message_ids = [status_message_id]
+            else:
+                self.__latest_status_message_ids.append(status_message_id)
+
             self.__components[component_name] = epoch_number
             self._update_latest_full_epoch()
-            LOGGER.debug("Ready message for epoch %d from component %s registered.",
-                         epoch_number, component_name)
+            LOGGER.debug("Ready message for epoch {:d} from component {:s} registered.".format(
+                epoch_number, component_name))
 
     def get_component_list(self, latest_epoch_less_than=None):
         """Returns a list of the registered simulation components."""
@@ -74,6 +85,11 @@ class SimulationComponents():
     def get_latest_full_epoch(self):
         """Returns the latest epoch number for which all registered components have responded with a ready message."""
         return self.__latest_full_epoch
+
+    def get_latest_status_message_ids(self):
+        """Returns the status message ids for the latest epoch as a list.
+           The ids are given in the order they have been registered."""
+        return self.__latest_status_message_ids
 
     def __str__(self):
         """Returns a list of the component names with the latest epoch numbers given in parenthesis after each name."""

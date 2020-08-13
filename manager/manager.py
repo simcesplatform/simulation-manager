@@ -166,7 +166,7 @@ class SimulationManager:
         elif message_object.source_process_id != self.__manager_name:
             LOGGER.debug("Received a status message from {:s}".format(message_object.source_process_id))
             self.__simulation_components.register_ready_message(
-                message_object.source_process_id, message_object.epoch_number)
+                message_object.source_process_id, message_object.epoch_number, message_object.message_id)
             await self.check_components()
 
     async def error_message_handler(self, message_object, message_routing_key):
@@ -227,7 +227,7 @@ class SimulationManager:
             "SourceProcessId": self.manager_name,
             "MessageId": next(self.__message_id_generator),
             "EpochNumber": self.epoch_number,
-            "TriggeringMessageIds": ["placeholder"],
+            "TriggeringMessageIds": self.__simulation_components.get_latest_status_message_ids(),
             "StartTime": self.__current_start_time,
             "EndTime": self.__current_end_time
         })

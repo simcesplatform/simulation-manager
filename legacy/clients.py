@@ -207,7 +207,9 @@ class RabbitmqClient:
     #                     exchange_name, aio_pika.exchange.ExchangeType.TOPIC)
 
     #                 while True:
-    #                     LOGGER.debug("{:d} {:s} {:s}".format(message_sent_connection_counter, topic_name, str(message_to_publish)))
+    #                     LOGGER.debug("{:d} {:s} {:s}".format(
+    #                         message_sent_connection_counter, topic_name,
+    #                         str(message_to_publish)))
     #                     await rabbitmq_exchange.publish(
     #                         aio_pika.Message(message_to_publish),
     #                         routing_key=topic_name)
@@ -218,7 +220,8 @@ class RabbitmqClient:
     #                         message_sent_connection_counter))
 
     #                     try:
-    #                         LOGGER.debug("{:.1f}".format(max(SHORT_TIMEOUT_INTERVAL - (time.time() - last_publish_time), 1)))
+    #                         LOGGER.debug("{:.1f}".format(max(SHORT_TIMEOUT_INTERVAL -
+    #                             (time.time() - last_publish_time), 1)))
     #                         message_item = send_queue.get(
     #                             timeout=max(SHORT_TIMEOUT_INTERVAL - (time.time() - last_publish_time), 1))
     #                         if message_item is None:

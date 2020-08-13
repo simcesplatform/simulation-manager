@@ -56,6 +56,7 @@ class DummyComponent:
         self.__simulation_state = DummyComponent.SIMULATION_STATE_VALUE_STOPPED
         self.__latest_epoch = 0
         self.__completed_epoch = 0
+        self.__triggering_message_id = ""
 
         self.__end_queue = end_queue
         self.__message_id_generator = get_next_message_id(component_name)
@@ -152,6 +153,7 @@ class DummyComponent:
         else:
             LOGGER.debug("Received a state message from {:s} on topic {:s}".format(
                 message_object.source_process_id, message_routing_key))
+            self.__triggering_message_id = message_object.message_id
             await self.set_simulation_state(message_object.simulation_state)
 
     async def epoch_message_handler(self, message_object, message_routing_key):
@@ -167,6 +169,7 @@ class DummyComponent:
         else:
             LOGGER.debug("Received an epoch from {:s} on topic {:s}".format(
                 message_object.source_process_id, message_routing_key))
+            self.__triggering_message_id = message_object.message_id
             await self.start_epoch(message_object.epoch_number)
 
     async def __send_new_status_message(self):
@@ -191,7 +194,7 @@ class DummyComponent:
             "SourceProcessId": self.component_name,
             "MessageId": next(self.__message_id_generator),
             "EpochNumber": self.__latest_epoch,
-            "TriggeringMessageIds": ["placeholder"],
+            "TriggeringMessageIds": [self.__triggering_message_id],
             "Value": StatusMessage.STATUS_VALUES[0]
         })
         if status_message is None:
