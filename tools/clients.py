@@ -5,12 +5,12 @@
 import asyncio
 import queue
 import threading
-import time
 
 import aio_pika
 
+from tools.callbacks import MessageCallback
 from tools.messages import AbstractMessage
-from tools.tools import FullLogger, load_environmental_variables
+from tools.tools import FullLogger, handle_async_exception, load_environmental_variables
 
 LOGGER = FullLogger(__name__)
 
@@ -64,10 +64,6 @@ def validate_message(topic_name, message_to_publish):
     return topic_name, message_to_publish
 
 
-def handle_async_exception(loop, context):
-    LOGGER.warning("Exception in async task: {}".format(context.get("message", "")))
-
-
 class RabbitmqClient:
     """RabbitMQ client that can be used to send messages and to create topic listeners."""
     DEFAULT_ENV_VARIABLE_PREFIX = "RABBITMQ_"
@@ -92,11 +88,11 @@ class RabbitmqClient:
 
     @property
     def listeners(self):
-        """Returns a dictionary containing the topics as keys and
-           a list of (thread, callback class)-tuples as values."""
+        """Returns a dictionary containing the topic names as keys and
+           a list of (thread, callback function)-tuples as values."""
         return self.__listeners
 
-    def add_listeners(self, topic_names, callback_class):
+    def add_listener(self, topic_names, callback_function):
         """Adds a new listener to the given topic."""
         if isinstance(topic_names, str):
             topic_names = [topic_names]
@@ -109,14 +105,14 @@ class RabbitmqClient:
                 "connection_parameters": self.__connection_parameters,
                 "exchange_name": self.__exchange_name,
                 "topic_names": topic_names,
-                "callback_class": callback_class
+                "callback_class": MessageCallback(callback_function)
             })
 
         new_listener_thread.start()
         for topic_name in topic_names:
             if topic_name not in self.__listeners:
                 self.__listeners[topic_name] = []
-            self.__listeners[topic_name].append((new_listener_thread, callback_class))
+            self.__listeners[topic_name].append((new_listener_thread, callback_function))
 
     # def remove_listener(self, topic_name):
     #     """Removes all listeners from the given topic."""
@@ -134,7 +130,7 @@ class RabbitmqClient:
             return
 
         try:
-            asyncio.get_event_loop().set_exception_handler(handle_async_exception)
+            asyncio.get_running_loop().set_exception_handler(handle_async_exception)
             rabbitmq_connection = await aio_pika.connect_robust(**self.__connection_parameters)
 
             rabbitmq_channel = await rabbitmq_connection.channel()
@@ -153,7 +149,11 @@ class RabbitmqClient:
         """The listener thread loop that listens to the given topic in the message bus and
            sends the received messages to the callback() function of the given callback class."""
         LOGGER.info("Opening listener thread for RabbitMQ client for the topics '{:s}'".format(", ".join(topic_names)))
-        asyncio.run(cls.start_listen_connection(connection_parameters, exchange_name, topic_names, callback_class))
+        asyncio.run(cls.start_listen_connection(
+            connection_parameters=connection_parameters,
+            exchange_name=exchange_name,
+            topic_names=topic_names,
+            callback_class=callback_class))
         LOGGER.info("Closing listener thread for RabbitMQ client for the topics '{:s}'".format(", ".join(topic_names)))
 
     @classmethod
@@ -162,7 +162,7 @@ class RabbitmqClient:
         if isinstance(topic_names, str):
             topic_names = [topic_names]
 
-        asyncio.get_event_loop().set_exception_handler(handle_async_exception)
+        asyncio.get_running_loop().set_exception_handler(handle_async_exception)
         while True:
             try:
                 rabbitmq_connection = await aio_pika.connect_robust(**connection_parameters)

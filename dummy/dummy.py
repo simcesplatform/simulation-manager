@@ -7,14 +7,13 @@ import queue
 import random
 import threading
 
-from tools.callbacks import GeneralMessageCallback
 from tools.clients import RabbitmqClient
 from tools.messages import EpochMessage, ErrorMessage, StatusMessage, SimulationStateMessage, get_next_message_id
 from tools.tools import FullLogger, load_environmental_variables
 
 LOGGER = FullLogger(__name__)
 
-TIMEOUT_INTERVAL = 15
+TIMEOUT_INTERVAL = 10
 
 __SIMULATION_ID = "SIMULATION_ID"
 __SIMULATION_COMPONENT_NAME = "SIMULATION_COMPONENT_NAME"
@@ -25,7 +24,10 @@ __SIMULATION_ERROR_MESSAGE_TOPIC = "SIMULATION_ERROR_MESSAGE_TOPIC"
 
 __MIN_SLEEP_TIME = "MIN_SLEEP_TIME"
 __MAX_SLEEP_TIME = "MAX_SLEEP_TIME"
-__ERROR_CHANGE = "ERROR_CHANGE"
+
+__ERROR_CHANCE = "ERROR_CHANCE"
+__SEND_MISS_CHANCE = "SEND_MISS_CHANCE"
+__RECEIVE_MISS_CHANCE = "RECEIVE_MISS_CHANCE"
 
 
 class DummyComponent:
@@ -35,7 +37,7 @@ class DummyComponent:
 
     def __init__(self, rabbitmq_client, simulation_id, component_name,
                  simulation_state_topic, epoch_topic, status_topic, error_topic,
-                 min_delay, max_delay, error_change, end_queue):
+                 min_delay, max_delay, error_chance, send_miss_chance, receive_miss_chance, end_queue):
         self.__rabbitmq_client = rabbitmq_client
         self.__simulation_id = simulation_id
         self.__component_name = component_name
@@ -47,7 +49,9 @@ class DummyComponent:
 
         self.__min_delay = min_delay
         self.__max_delay = max_delay
-        self.__error_change = error_change
+        self.__error_chance = error_chance
+        self.__send_miss_chance = send_miss_chance
+        self.__receive_miss_chance = receive_miss_chance
 
         self.__simulation_state = DummyComponent.SIMULATION_STATE_VALUE_STOPPED
         self.__latest_epoch = 0
@@ -56,12 +60,12 @@ class DummyComponent:
         self.__end_queue = end_queue
         self.__message_id_generator = get_next_message_id(component_name)
 
-        self.__rabbitmq_client.add_listeners(
+        self.__rabbitmq_client.add_listener(
             [
                 self.__simulation_state_topic,
                 self.__epoch_topic
             ],
-            GeneralMessageCallback(self.general_message_handler))
+            self.general_message_handler)
 
     @property
     def simulation_id(self):
@@ -107,9 +111,10 @@ class DummyComponent:
                 await self.__send_new_status_message()
                 return
 
-            rand_error_change = random.random()
-            if rand_error_change < self.__error_change:
-                await self.__send_error_message("Bad error")
+            rand_error_chance = random.random()
+            if rand_error_chance < self.__error_chance:
+                LOGGER.error("Encountered a random error.")
+                await self.__send_error_message("Random error")
             else:
                 rand_wait_time = random.randint(self.__min_delay, self.__max_delay)
                 LOGGER.info("Component {:s} sending status message for epoch {:d} in {:d} seconds.".format(
@@ -121,7 +126,14 @@ class DummyComponent:
         """Forwards the message handling to the appropriate function depending on the message type."""
         if isinstance(message_object, SimulationStateMessage):
             await self.simulation_state_message_handler(message_object, message_routing_key)
-        elif isinstance(message_object, EpochMessage):
+            return
+
+        if random.random() < self.__receive_miss_chance:
+            # Simulate a connection error by not receiving an epoch message.
+            LOGGER.warning("Received message was ignored.")
+            return
+
+        if isinstance(message_object, EpochMessage):
             await self.epoch_message_handler(message_object, message_routing_key)
         else:
             LOGGER.warning("Received '{:s}' message when expecting for '{:s}' or '{:s}' message".format(
@@ -159,7 +171,13 @@ class DummyComponent:
 
     async def __send_new_status_message(self):
         new_status_message = self.__get_status_message()
-        await self.__rabbitmq_client.send_message(self.__status_topic, new_status_message)
+
+        if self.__latest_epoch > 0 and random.random() < self.__send_miss_chance:
+            # simulate connection error by not sending the status message for an epoch
+            LOGGER.warning("No status message sent this time.")
+        else:
+            await self.__rabbitmq_client.send_message(self.__status_topic, new_status_message)
+
         self.__completed_epoch = self.__latest_epoch
 
     async def __send_error_message(self, description):
@@ -208,24 +226,28 @@ async def start_dummy_component():
         (__SIMULATION_ERROR_MESSAGE_TOPIC, str, "error"),
         (__MIN_SLEEP_TIME, int, 2),
         (__MAX_SLEEP_TIME, int, 15),
-        (__ERROR_CHANGE, float, 0.0)
+        (__ERROR_CHANCE, float, 0.0),
+        (__SEND_MISS_CHANCE, float, 0.0),
+        (__RECEIVE_MISS_CHANCE, float, 0.0)
     )
 
     message_client = RabbitmqClient()
 
     end_queue = queue.Queue()
     dummy_component = DummyComponent(
-        message_client,
-        env_variables[__SIMULATION_ID],
-        env_variables[__SIMULATION_COMPONENT_NAME],
-        env_variables[__SIMULATION_STATE_MESSAGE_TOPIC],
-        env_variables[__SIMULATION_EPOCH_MESSAGE_TOPIC],
-        env_variables[__SIMULATION_STATUS_MESSAGE_TOPIC],
-        env_variables[__SIMULATION_ERROR_MESSAGE_TOPIC],
-        env_variables[__MIN_SLEEP_TIME],
-        env_variables[__MAX_SLEEP_TIME],
-        env_variables[__ERROR_CHANGE],
-        end_queue)
+        rabbitmq_client=message_client,
+        simulation_id=env_variables[__SIMULATION_ID],
+        component_name=env_variables[__SIMULATION_COMPONENT_NAME],
+        simulation_state_topic=env_variables[__SIMULATION_STATE_MESSAGE_TOPIC],
+        epoch_topic=env_variables[__SIMULATION_EPOCH_MESSAGE_TOPIC],
+        status_topic=env_variables[__SIMULATION_STATUS_MESSAGE_TOPIC],
+        error_topic=env_variables[__SIMULATION_ERROR_MESSAGE_TOPIC],
+        min_delay=env_variables[__MIN_SLEEP_TIME],
+        max_delay=env_variables[__MAX_SLEEP_TIME],
+        error_chance=env_variables[__ERROR_CHANCE],
+        send_miss_chance=env_variables[__SEND_MISS_CHANCE],
+        receive_miss_chance=env_variables[__RECEIVE_MISS_CHANCE],
+        end_queue=end_queue)
 
     while True:
         end_item = end_queue.get()

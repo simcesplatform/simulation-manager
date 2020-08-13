@@ -5,7 +5,6 @@
 import asyncio
 import queue
 
-from tools.callbacks import GeneralMessageCallback
 from tools.clients import RabbitmqClient
 from tools.messages import AbstractMessage, SimulationStateMessage
 from tools.tools import FullLogger, load_environmental_variables
@@ -24,7 +23,7 @@ class ListenerComponent:
         self.__simulation_id = simulation_id
         self.__end_queue = end_queue
 
-        self.__rabbitmq_client.add_listeners("#", GeneralMessageCallback(self.simulation_message_handler))
+        self.__rabbitmq_client.add_listener("#", self.simulation_message_handler)
 
     @property
     def simulation_id(self):

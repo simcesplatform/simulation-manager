@@ -159,3 +159,8 @@ def get_logger(logger_name):
 
 
 LOGGER = FullLogger(__name__)
+
+
+def handle_async_exception(loop, context):
+    """Prints out any unhandled exceptions from async tasks."""
+    LOGGER.warning("Exception in async task: {}".format(str(context)))

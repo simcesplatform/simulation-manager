@@ -4,7 +4,7 @@
 
 import unittest
 
-from tools.components import SimulationComponents
+from manager.components import SimulationComponents
 
 NO_MESSAGES = -1
 
@@ -62,13 +62,14 @@ class TestSimulationComponents(unittest.TestCase):
 
     def test_simulation_phases(self):
         """Tests the latest epoch calculations."""
-        new_component_names = ["generator", "planner", "logger"]
+        new_component_names = ["generator", "planner", "logger", "extra", "watcher"]
         component_names_expect_first = new_component_names[1:]
         component_names_expect_last = new_component_names[:len(new_component_names)-1]
         component_names_expect_middle = new_component_names[:len(new_component_names) // 2] + \
             new_component_names[len(new_component_names) // 2 + 1:]
         ready_messages = {
-            1: (component_names_expect_first, NO_MESSAGES),
+            0: (new_component_names, 0),
+            1: (component_names_expect_first, 0),
             2: (new_component_names, 2),
             3: (new_component_names, 3),
             4: (component_names_expect_first, 3),

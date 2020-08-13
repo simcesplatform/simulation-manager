@@ -9,8 +9,10 @@ services:
     image: simulation_manager_tests:0.1
     container_name: simulation_manager_tests
     restart: "no"
+    environment:
+      - SIMULATION_LOG_LEVEL=40
     networks:
-     - test_network
+      - test_network
 
 networks:
   test_network:
