@@ -45,7 +45,7 @@ class Timer:
             "callback": self.__callback.__name__
         }))
 
-    async def __timed_task(self, *args, **kwargs):
+    async def __timed_task(self):
         """Sleeps and calls the callback function after the sleep."""
         while True:
             LOGGER.debug("Timer started: {:s}".format(str(self)))

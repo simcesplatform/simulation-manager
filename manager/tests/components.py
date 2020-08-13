@@ -85,9 +85,10 @@ class TestSimulationComponents(unittest.TestCase):
 
         for epoch_number, (component_names, full_epoch) in ready_messages.items():
             for epoch_component_name in component_names:
-                components.register_ready_message(epoch_component_name, epoch_number)
+                components.register_ready_message(epoch_component_name, epoch_number, epoch_component_name)
 
             self.assertEqual(components.get_latest_full_epoch(), full_epoch)
+            self.assertEqual(components.get_latest_status_message_ids(), ready_messages[epoch_number][0])
 
             for actual_component_name in new_component_names:
                 self.assertGreaterEqual(components.get_latest_epoch_for_component(actual_component_name), full_epoch)

@@ -49,7 +49,9 @@ def isoformat_to_milliseconds(datetime_str: str):
     second_fraction_mark_index = datetime_str.find(".")
     if second_fraction_mark_index >= 0:
         number_of_decimals = len(datetime_str) - second_fraction_mark_index
-        return datetime_str[:second_fraction_mark_index + DIGITS_IN_MILLISECONDS + 1] + \
-               "0" * max(DIGITS_IN_MILLISECONDS - number_of_decimals, 0)
+        return (
+            datetime_str[:second_fraction_mark_index + DIGITS_IN_MILLISECONDS + 1] +
+            "0" * max(DIGITS_IN_MILLISECONDS - number_of_decimals, 0)
+        )
 
     return datetime_str + "." + "0" * DIGITS_IN_MILLISECONDS

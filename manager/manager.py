@@ -5,7 +5,6 @@
 import asyncio
 import datetime
 import queue
-import threading
 
 from manager.components import SimulationComponents
 from tools.clients import RabbitmqClient
@@ -111,6 +110,8 @@ class SimulationManager:
         return self.__simulation_state
 
     async def set_simulation_state(self, new_simulation_state):
+        """Sets the simulation state. Sends a simulation state message to the message bus.
+           If the new simulation state is "stopped", stops the entire the simulation."""
         if new_simulation_state in (
                 SimulationManager.SIMULATION_STATE_VALUE_RUNNING,
                 SimulationManager.SIMULATION_STATE_VALUE_STOPPED):
@@ -164,7 +165,8 @@ class SimulationManager:
                 "Received a status message with an unknown value: '{:s}' instead of '{:s}'".format(
                     message_object.value, SimulationManager.STATUS_MESSAGE_VALUE_OK))
         elif message_object.source_process_id != self.__manager_name:
-            LOGGER.debug("Received a status message from {:s}".format(message_object.source_process_id))
+            LOGGER.debug("Received a status message from {:s} at topic {:s}".format(
+                message_object.source_process_id, message_routing_key))
             self.__simulation_components.register_ready_message(
                 message_object.source_process_id, message_object.epoch_number, message_object.message_id)
             await self.check_components()
@@ -180,8 +182,8 @@ class SimulationManager:
                 "Received an error message with wrong message type: '{:s}' instead of '{:s}'".format(
                     message_object.message_type, ErrorMessage.CLASS_MESSAGE_TYPE))
         else:
-            LOGGER.debug("Received an error message from {:s} with description '{:s}'".format(
-                message_object.source_process_id, message_object.description))
+            LOGGER.debug("Received an error message from {:s} with description '{:s}' at topic {:s}".format(
+                message_object.source_process_id, message_object.description, message_routing_key))
             await self.stop()
 
     async def __send_epoch_message(self, new_epoch=True):

@@ -71,7 +71,6 @@ class MessageCallback():
 
     async def callback(self, message):
         """Callback function for the received messages from the message bus."""
-        """General allback function for the received messages."""
         with self.__lock:
             message_str = message.body.decode(MessageCallback.MESSAGE_CODING)
             message_json = json.loads(message_str)

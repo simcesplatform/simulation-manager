@@ -30,11 +30,6 @@ class ListenerComponent:
         """The simulation ID for the simulation."""
         return self.__simulation_id
 
-    @property
-    def simulation_topics(self):
-        """The component name in the simulation."""
-        return self.__simulation_topics
-
     async def simulation_message_handler(self, message_object, message_routing_key):
         """Handles the received simulation state messages."""
         if isinstance(message_object, AbstractMessage):
@@ -66,7 +61,7 @@ def start_listener_component():
     message_client = RabbitmqClient()
 
     end_queue = queue.Queue()
-    listener_component = ListenerComponent(
+    ListenerComponent(
         message_client,
         env_variables[__SIMULATION_ID],
         end_queue)

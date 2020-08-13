@@ -33,8 +33,7 @@ class SimulationComponents():
     def remove_component(self, component_name: str):
         """Removes the given component from the simulation component list.
            If the given component_name is not found in the list, the function prints an error message."""
-        if (self.__components.pop(component_name, None) is None or
-                self.__last_status_message_ids.pop(component_name, None) is None):
+        if self.__components.pop(component_name, None) is None:
             LOGGER.warning("{:s} was not found in the simulation component list".format(component_name))
         else:
             LOGGER.info("Component: {:s} removed from SimulationComponents.".format(component_name))

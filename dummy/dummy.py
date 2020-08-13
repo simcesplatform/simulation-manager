@@ -5,7 +5,6 @@
 import asyncio
 import queue
 import random
-import threading
 
 from tools.clients import RabbitmqClient
 from tools.messages import EpochMessage, ErrorMessage, StatusMessage, SimulationStateMessage, get_next_message_id
@@ -88,6 +87,9 @@ class DummyComponent:
         return self.__simulation_state
 
     async def set_simulation_state(self, new_simulation_state):
+        """Sets the simulation state. If the new simulation state is "running" and the current epoch is 0,
+           sends a status message to the message bus.
+           If the new simulation state is "stopped", stops the dummy component."""
         if new_simulation_state in SimulationStateMessage.SIMULATION_STATES:
             self.__simulation_state = new_simulation_state
 

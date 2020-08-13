@@ -2,16 +2,16 @@
 
 """This module contains the exception classes for the message errors."""
 
-from tools.tools import get_logger
+from tools.tools import FullLogger
 
-FILE_LOGGER = get_logger(__name__)
+LOGGER = FullLogger(__name__)
 
 
 class MessageError(Exception):
     """Base class for message related errors."""
     def __init__(self, message):
         super(MessageError, self).__init__(message)
-        FILE_LOGGER.error(message)
+        LOGGER.error(message)
         self.message = message
 
 

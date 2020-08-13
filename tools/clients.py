@@ -3,7 +3,6 @@
 """This module contains a class for keeping track of the simulation components."""
 
 import asyncio
-import queue
 import threading
 
 import aio_pika
@@ -84,7 +83,6 @@ class RabbitmqClient:
     def close(self):
         """Closes the sender thread and all the listener threads.
            Note: not really needed since all threads have been created with the daemon flag."""
-        pass
 
     @property
     def listeners(self):
@@ -141,7 +139,7 @@ class RabbitmqClient:
             LOGGER.debug("Message '{:s}' send to topic: '{:s}'".format(
                 message_to_publish.decode(RabbitmqClient.MESSAGE_ENCODING), topic_name))
 
-        except Exception as error:
+        except RuntimeError as error:
             LOGGER.warning("Error: '{:s}' when trying to publish message.".format(str(error)))
 
     @classmethod
@@ -192,7 +190,7 @@ class RabbitmqClient:
                                     message.body.decode(cls.MESSAGE_ENCODING), message.routing_key))
                                 await callback_class.callback(message)
 
-            except Exception as error:
+            except RuntimeError as error:
                 LOGGER.warning("Error: '{:s}' when trying to listen to the message bus.".format(str(error)))
 
     @classmethod
