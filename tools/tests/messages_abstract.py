@@ -10,7 +10,6 @@ import unittest
 import tools.exceptions.messages
 import tools.messages
 from tools.datetime_tools import to_utc_datetime_object
-from tools.tools import FullLogger
 
 from tools.tests.messages_common import MESSAGE_TYPE_ATTRIBUTE
 from tools.tests.messages_common import TIMESTAMP_ATTRIBUTE
@@ -23,8 +22,6 @@ from tools.tests.messages_common import DEFAULT_SIMULATION_ID
 from tools.tests.messages_common import DEFAULT_SOURCE_PROCESS_ID
 from tools.tests.messages_common import DEFAULT_MESSAGE_ID
 from tools.tests.messages_common import FULL_JSON
-
-LOGGER = FullLogger(__name__)
 
 
 class TestAbstractMessage(unittest.TestCase):

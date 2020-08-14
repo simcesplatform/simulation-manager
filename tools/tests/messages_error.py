@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-"""Unit test for the AbstractResultMessage class."""
+"""Unit test for the ErrorMessage class."""
 
 import copy
 import datetime
@@ -20,6 +20,7 @@ from tools.tests.messages_common import EPOCH_NUMBER_ATTRIBUTE
 from tools.tests.messages_common import LAST_UPDATED_IN_EPOCH_ATTRIBUTE
 from tools.tests.messages_common import TRIGGERING_MESSAGE_IDS_ATTRIBUTE
 from tools.tests.messages_common import WARNINGS_ATTRIBUTE
+from tools.tests.messages_common import DESCRIPTION_ATTRIBUTE
 from tools.tests.messages_common import DEFAULT_TYPE
 from tools.tests.messages_common import DEFAULT_TIMESTAMP
 from tools.tests.messages_common import DEFAULT_SIMULATION_ID
@@ -29,20 +30,21 @@ from tools.tests.messages_common import DEFAULT_EPOCH_NUMBER
 from tools.tests.messages_common import DEFAULT_LAST_UPDATED_IN_EPOCH
 from tools.tests.messages_common import DEFAULT_TRIGGERING_MESSAGE_IDS
 from tools.tests.messages_common import DEFAULT_WARNINGS
+from tools.tests.messages_common import DEFAULT_DESCRIPTION
 from tools.tests.messages_common import FULL_JSON
 
 
-class TestAbstractResultMessage(unittest.TestCase):
-    """Unit tests for the AbstractResultMessage class."""
+class TestErrorMessage(unittest.TestCase):
+    """Unit tests for the ErrorMessage class."""
 
     def test_message_creation(self):
-        """Unit test for creating instances of AbstractResultMessage class."""
+        """Unit test for creating instances of ErrorMessage class."""
 
         # When message is created without a Timestamp attribute,
         # the current time in millisecond precision is used as the default value.
         utcnow1 = datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc)
         utcnow1 -= datetime.timedelta(microseconds=utcnow1.microsecond % 1000)
-        message_full = tools.messages.AbstractResultMessage.from_json(FULL_JSON)
+        message_full = tools.messages.ErrorMessage.from_json(FULL_JSON)
         message_timestamp = to_utc_datetime_object(message_full.timestamp)
         utcnow2 = datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc)
         utcnow1 -= datetime.timedelta(microseconds=utcnow2.microsecond % 1000)
@@ -57,9 +59,10 @@ class TestAbstractResultMessage(unittest.TestCase):
         self.assertEqual(message_full.last_updated_in_epoch, DEFAULT_LAST_UPDATED_IN_EPOCH)
         self.assertEqual(message_full.triggering_message_ids, DEFAULT_TRIGGERING_MESSAGE_IDS)
         self.assertEqual(message_full.warnings, DEFAULT_WARNINGS)
+        self.assertEqual(message_full.description, DEFAULT_DESCRIPTION)
 
         # Test with explicitely set timestamp
-        message_timestamped = tools.messages.AbstractResultMessage(Timestamp=DEFAULT_TIMESTAMP, **FULL_JSON)
+        message_timestamped = tools.messages.ErrorMessage(Timestamp=DEFAULT_TIMESTAMP, **FULL_JSON)
         self.assertEqual(message_timestamped.timestamp, DEFAULT_TIMESTAMP)
         self.assertEqual(message_timestamped.message_type, DEFAULT_TYPE)
         self.assertEqual(message_timestamped.simulation_id, DEFAULT_SIMULATION_ID)
@@ -69,12 +72,13 @@ class TestAbstractResultMessage(unittest.TestCase):
         self.assertEqual(message_timestamped.last_updated_in_epoch, DEFAULT_LAST_UPDATED_IN_EPOCH)
         self.assertEqual(message_timestamped.triggering_message_ids, DEFAULT_TRIGGERING_MESSAGE_IDS)
         self.assertEqual(message_timestamped.warnings, DEFAULT_WARNINGS)
+        self.assertEqual(message_timestamped.description, DEFAULT_DESCRIPTION)
 
         # Test message creation without the optional attributes.
         stripped_json = copy.deepcopy(FULL_JSON)
         stripped_json.pop(LAST_UPDATED_IN_EPOCH_ATTRIBUTE)
         stripped_json.pop(WARNINGS_ATTRIBUTE)
-        message_stripped = tools.messages.AbstractResultMessage(Timestamp=DEFAULT_TIMESTAMP, **stripped_json)
+        message_stripped = tools.messages.ErrorMessage(Timestamp=DEFAULT_TIMESTAMP, **stripped_json)
         self.assertEqual(message_stripped.timestamp, DEFAULT_TIMESTAMP)
         self.assertEqual(message_stripped.message_type, DEFAULT_TYPE)
         self.assertEqual(message_stripped.simulation_id, DEFAULT_SIMULATION_ID)
@@ -84,10 +88,11 @@ class TestAbstractResultMessage(unittest.TestCase):
         self.assertEqual(message_stripped.last_updated_in_epoch, None)
         self.assertEqual(message_stripped.triggering_message_ids, DEFAULT_TRIGGERING_MESSAGE_IDS)
         self.assertEqual(message_stripped.warnings, None)
+        self.assertEqual(message_stripped.description, DEFAULT_DESCRIPTION)
 
     def test_message_json(self):
         """Unit test for testing that the json from a message has correct attributes."""
-        message_full_json = tools.messages.AbstractResultMessage.from_json(FULL_JSON).json()
+        message_full_json = tools.messages.ErrorMessage.from_json(FULL_JSON).json()
 
         self.assertIn(MESSAGE_TYPE_ATTRIBUTE, message_full_json)
         self.assertIn(SIMULATION_ID_ATTRIBUTE, message_full_json)
@@ -98,13 +103,14 @@ class TestAbstractResultMessage(unittest.TestCase):
         self.assertIn(LAST_UPDATED_IN_EPOCH_ATTRIBUTE, message_full_json)
         self.assertIn(TRIGGERING_MESSAGE_IDS_ATTRIBUTE, message_full_json)
         self.assertIn(WARNINGS_ATTRIBUTE, message_full_json)
-        self.assertEqual(len(message_full_json), 9)
+        self.assertIn(DESCRIPTION_ATTRIBUTE, message_full_json)
+        self.assertEqual(len(message_full_json), 10)
 
     def test_message_bytes(self):
         """Unit test for testing that the bytes conversion works correctly."""
         # Convert to bytes and back to Message instance
-        message_full = tools.messages.AbstractResultMessage.from_json(FULL_JSON)
-        message_copy = tools.messages.AbstractResultMessage.from_json(
+        message_full = tools.messages.ErrorMessage.from_json(FULL_JSON)
+        message_copy = tools.messages.ErrorMessage.from_json(
             json.loads(message_full.bytes().decode("UTF-8"))
         )
 
@@ -117,10 +123,11 @@ class TestAbstractResultMessage(unittest.TestCase):
         self.assertEqual(message_copy.last_updated_in_epoch, message_full.last_updated_in_epoch)
         self.assertEqual(message_copy.triggering_message_ids, message_full.triggering_message_ids)
         self.assertEqual(message_copy.warnings, message_full.warnings)
+        self.assertEqual(message_copy.description, message_full.description)
 
     def test_invalid_values(self):
         """Unit tests for testing that invalid attribute values are recognized."""
-        message_full = tools.messages.AbstractResultMessage.from_json(FULL_JSON)
+        message_full = tools.messages.ErrorMessage.from_json(FULL_JSON)
         message_full_json = message_full.json()
 
         allowed_message_types = [
@@ -165,7 +172,8 @@ class TestAbstractResultMessage(unittest.TestCase):
             EPOCH_NUMBER_ATTRIBUTE: tools.exceptions.messages.MessageEpochValueError,
             LAST_UPDATED_IN_EPOCH_ATTRIBUTE: tools.exceptions.messages.MessageEpochValueError,
             TRIGGERING_MESSAGE_IDS_ATTRIBUTE: tools.exceptions.messages.MessageIdError,
-            WARNINGS_ATTRIBUTE: tools.exceptions.messages.MessageValueError
+            WARNINGS_ATTRIBUTE: tools.exceptions.messages.MessageValueError,
+            DESCRIPTION_ATTRIBUTE: tools.exceptions.messages.MessageValueError
         }
         invalid_attribute_values = {
             MESSAGE_TYPE_ATTRIBUTE: ["Test", 12, ""],
@@ -176,7 +184,8 @@ class TestAbstractResultMessage(unittest.TestCase):
             EPOCH_NUMBER_ATTRIBUTE: [-1, "epoch", "12", ""],
             LAST_UPDATED_IN_EPOCH_ATTRIBUTE: [-1, "epoch", "12", ""],
             TRIGGERING_MESSAGE_IDS_ATTRIBUTE: [["process-12", "process2-"], ["process-"], []],
-            WARNINGS_ATTRIBUTE: [["warning.convergence", "warning"], ["warning."], ["warning.random"]]
+            WARNINGS_ATTRIBUTE: [["warning.convergence", "warning"], ["warning."], ["warning.random"]],
+            DESCRIPTION_ATTRIBUTE: [12, ["description"], ""]
         }
         for invalid_attribute in invalid_attribute_exceptions:
             if invalid_attribute != TIMESTAMP_ATTRIBUTE and invalid_attribute not in optional_attributes:
@@ -184,14 +193,14 @@ class TestAbstractResultMessage(unittest.TestCase):
                 json_invalid_attribute.pop(invalid_attribute)
                 self.assertRaises(
                     invalid_attribute_exceptions[invalid_attribute],
-                    tools.messages.AbstractResultMessage, **json_invalid_attribute)
+                    tools.messages.ErrorMessage, **json_invalid_attribute)
 
             for invalid_value in invalid_attribute_values[invalid_attribute]:
                 json_invalid_attribute = copy.deepcopy(message_full_json)
                 json_invalid_attribute[invalid_attribute] = invalid_value
                 self.assertRaises(
                     (ValueError, invalid_attribute_exceptions[invalid_attribute]),
-                    tools.messages.AbstractResultMessage, **json_invalid_attribute)
+                    tools.messages.ErrorMessage, **json_invalid_attribute)
 
 
 if __name__ == '__main__':

@@ -10,7 +10,6 @@ import unittest
 import tools.exceptions.messages
 import tools.messages
 from tools.datetime_tools import to_utc_datetime_object
-from tools.tools import FullLogger
 
 from tools.tests.messages_common import MESSAGE_TYPE_ATTRIBUTE
 from tools.tests.messages_common import TIMESTAMP_ATTRIBUTE
@@ -35,8 +34,6 @@ from tools.tests.messages_common import DEFAULT_WARNINGS
 from tools.tests.messages_common import DEFAULT_START_TIME
 from tools.tests.messages_common import DEFAULT_END_TIME
 from tools.tests.messages_common import FULL_JSON
-
-LOGGER = FullLogger(__name__)
 
 
 class TestEpochMessage(unittest.TestCase):
