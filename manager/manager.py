@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-"""This module for Simulation Manager."""
+"""This module contains the main Simulation Manager code for the Simulation platform."""
 
 import asyncio
 import datetime
@@ -200,7 +200,7 @@ class SimulationManager:
             else:
                 LOGGER.info("Resending epoch message for Epoch {:d}".format(self.__epoch_number))
 
-            new_epoch_message = self.__get_epoch_message(EpochMessage.CLASS_MESSAGE_TYPE)
+            new_epoch_message = self.__get_epoch_message()
             await self.__rabbitmq_client.send_message(self.__epoch_topic, new_epoch_message)
             await self.__start_epoch_timer()
 
@@ -221,10 +221,10 @@ class SimulationManager:
 
         return state_message.bytes()
 
-    def __get_epoch_message(self, message_type):
+    def __get_epoch_message(self):
         """Returns a new message for the message bus."""
         epoch_message = EpochMessage(**{
-            "Type": message_type,
+            "Type": EpochMessage.CLASS_MESSAGE_TYPE,
             "SimulationId": self.simulation_id,
             "SourceProcessId": self.manager_name,
             "MessageId": next(self.__message_id_generator),
