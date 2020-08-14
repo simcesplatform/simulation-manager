@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-"""Unit test for the message module."""
+"""Unit test for the AbstractMessage class."""
 
 import copy
 import datetime
