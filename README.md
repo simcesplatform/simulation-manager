@@ -7,7 +7,7 @@ Omega, Simulation Manager and dummy components for the simulation platform.
 Edit the username and password in the file [`rabbitmq/rabbitmq.env`](rabbitmq/rabbitmq.env)
 
 ```bash
-docker-compose -f rabbitmq\docker-compose-rabbitmq.yml up --detach
+docker-compose -f rabbitmq/docker-compose-rabbitmq.yml up --detach
 ```
 
 ## Run test simulation
@@ -42,5 +42,5 @@ docker-compose -f docker-compose-test-simulation.yml down --remove-orphans
 ## Stop local RabbitMQ server
 
 ```bash
-docker-compose -f rabbitmq\docker-compose-rabbitmq.yml down --remove-orphans
+docker-compose -f rabbitmq/docker-compose-rabbitmq.yml down --remove-orphans
 ```
