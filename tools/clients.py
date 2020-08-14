@@ -140,7 +140,9 @@ class RabbitmqClient:
                 message_to_publish.decode(RabbitmqClient.MESSAGE_ENCODING), topic_name))
 
         except RuntimeError as error:
-            LOGGER.warning("Error: '{:s}' when trying to publish message.".format(str(error)))
+            LOGGER.warning("RunTimeError: '{:s}' when trying to publish message.".format(str(error)))
+        except ConnectionError as error:
+            LOGGER.warning("ConnectionError: '{:s}' when trying to publish message.".format(str(error)))
 
     @classmethod
     def listener_thread(cls, connection_parameters, exchange_name, topic_names, callback_class):
@@ -191,7 +193,9 @@ class RabbitmqClient:
                                 await callback_class.callback(message)
 
             except RuntimeError as error:
-                LOGGER.warning("Error: '{:s}' when trying to listen to the message bus.".format(str(error)))
+                LOGGER.warning("RuntimeError: '{:s}' when trying to listen to the message bus.".format(str(error)))
+            except ConnectionError as error:
+                LOGGER.warning("ConnectionError: '{:s}' when trying to publish message.".format(str(error)))
 
     @classmethod
     def __get_connection_parameters_only(cls, connection_config_dict):
