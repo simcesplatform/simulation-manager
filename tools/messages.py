@@ -11,6 +11,10 @@ from tools.tools import FullLogger
 
 LOGGER = FullLogger(__name__)
 
+OPTIONALLY_GENERATED_ATTRIBUTES = [
+    "Timestamp"
+]
+
 
 def get_next_message_id(source_process_id: str, start_number=1):
     """Generator for getting unique message ids."""
@@ -34,6 +38,9 @@ def validate_json(message_class, json_message: dict):
     """Validates the given the given json object for the attributes covered in AbstractMessage class.
         Returns True if the message is ok. Otherwise, return False."""
     for json_attribute_name, object_attribute_name in message_class.MESSAGE_ATTRIBUTES_FULL.items():
+        if json_attribute_name not in json_message and json_attribute_name in OPTIONALLY_GENERATED_ATTRIBUTES:
+            continue
+
         if (json_attribute_name not in json_message and
                 json_attribute_name not in message_class.OPTIONAL_ATTRIBUTES_FULL):
             LOGGER.warning("%s attribute is missing from the message", json_attribute_name)
@@ -153,7 +160,13 @@ class AbstractMessage():
 
     @classmethod
     def _check_message_id(cls, message_id):
-        return isinstance(message_id, str) and len(message_id) > 0
+        if not isinstance(message_id, str):
+            return False
+        split_message_id = message_id.split("-")
+        if len(split_message_id) != 2:
+            return False
+        source_process_id, message_identifier = split_message_id
+        return len(source_process_id) > 0 and len(message_identifier) > 0
 
     @classmethod
     def _check_timestamp(cls, timestamp):
