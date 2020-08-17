@@ -27,6 +27,7 @@ __MAX_SLEEP_TIME = "MAX_SLEEP_TIME"
 __ERROR_CHANCE = "ERROR_CHANCE"
 __SEND_MISS_CHANCE = "SEND_MISS_CHANCE"
 __RECEIVE_MISS_CHANCE = "RECEIVE_MISS_CHANCE"
+__WARNING_CHANCE = "WARNING_CHANCE"
 
 
 class DummyComponent:
@@ -35,8 +36,8 @@ class DummyComponent:
     SIMULATION_STATE_VALUE_STOPPED = SimulationStateMessage.SIMULATION_STATES[-1]  # "stopped"
 
     def __init__(self, rabbitmq_client, simulation_id, component_name,
-                 simulation_state_topic, epoch_topic, status_topic, error_topic,
-                 min_delay, max_delay, error_chance, send_miss_chance, receive_miss_chance, end_queue):
+                 simulation_state_topic, epoch_topic, status_topic, error_topic, min_delay, max_delay,
+                 error_chance, send_miss_chance, receive_miss_chance, warning_chance, end_queue):
         self.__rabbitmq_client = rabbitmq_client
         self.__simulation_id = simulation_id
         self.__component_name = component_name
@@ -51,6 +52,7 @@ class DummyComponent:
         self.__error_chance = error_chance
         self.__send_miss_chance = send_miss_chance
         self.__receive_miss_chance = receive_miss_chance
+        self.__warning_chance = warning_chance
 
         self.__simulation_state = DummyComponent.SIMULATION_STATE_VALUE_STOPPED
         self.__latest_epoch = 0
@@ -201,6 +203,9 @@ class DummyComponent:
         })
         if status_message is None:
             LOGGER.error("Problem with creating a status message")
+        elif random.random() < self.__warning_chance:
+            LOGGER.debug("Adding a warning to the status message.")
+            status_message.warnings = ["warning.internal"]
 
         return status_message.bytes()
 
@@ -211,7 +216,7 @@ class DummyComponent:
             "SourceProcessId": self.component_name,
             "MessageId": next(self.__message_id_generator),
             "EpochNumber": self.__latest_epoch,
-            "TriggeringMessageIds": ["placeholder"],
+            "TriggeringMessageIds": [self.__triggering_message_id],
             "Description": description
         })
         if error_message is None:
@@ -233,7 +238,8 @@ async def start_dummy_component():
         (__MAX_SLEEP_TIME, int, 15),
         (__ERROR_CHANCE, float, 0.0),
         (__SEND_MISS_CHANCE, float, 0.0),
-        (__RECEIVE_MISS_CHANCE, float, 0.0)
+        (__RECEIVE_MISS_CHANCE, float, 0.0),
+        (__WARNING_CHANCE, float, 0.0)
     )
 
     message_client = RabbitmqClient()
@@ -252,6 +258,7 @@ async def start_dummy_component():
         error_chance=env_variables[__ERROR_CHANCE],
         send_miss_chance=env_variables[__SEND_MISS_CHANCE],
         receive_miss_chance=env_variables[__RECEIVE_MISS_CHANCE],
+        warning_chance=env_variables[__WARNING_CHANCE],
         end_queue=end_queue)
 
     while True:

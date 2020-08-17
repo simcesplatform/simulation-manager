@@ -167,6 +167,9 @@ class SimulationManager:
         elif message_object.source_process_id != self.__manager_name:
             LOGGER.debug("Received a status message from {:s} at topic {:s}".format(
                 message_object.source_process_id, message_routing_key))
+            if message_object.warnings:
+                LOGGER.warning("Status message from '{:s}' contained warnings: {:s}".format(
+                    message_object.source_process_id, ", ".join(message_object.warnings)))
             self.__simulation_components.register_ready_message(
                 message_object.source_process_id, message_object.epoch_number, message_object.message_id)
             await self.check_components()
