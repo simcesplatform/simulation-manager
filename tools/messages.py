@@ -142,6 +142,15 @@ class AbstractMessage():
                 raise MessageDateError("'{:s}' is an invalid datetime".format(str(timestamp)))
             self.__timestamp = to_iso_format_datetime_string(timestamp)
 
+    def __eq__(self, other):
+        return (
+            self.message_type == other.message_type and
+            self.simulation_id == other.simulation_id and
+            self.source_process_id == other.source_process_id and
+            self.message_id == other.message_id and
+            self.timestamp == other.timestamp
+        )
+
     @classmethod
     def _check_datetime(cls, datetime_value):
         return to_iso_format_datetime_string(datetime_value) is not None
@@ -276,6 +285,15 @@ class AbstractResultMessage(AbstractMessage):
         else:
             self.__warnings = warnings
 
+    def __eq__(self, other):
+        return (
+            super().__eq__(other) and
+            self.epoch_number == other.epoch_number and
+            self.last_updated_in_epoch == other.last_updated_in_epoch and
+            self.triggering_message_ids == other.triggering_message_ids and
+            self.warnings == other.warnings
+        )
+
     @classmethod
     def _check_epoch_number(cls, epoch_number):
         # epoch number 0 is reserved for the initialization phase
@@ -347,6 +365,12 @@ class SimulationStateMessage(AbstractMessage):
                 str(simulation_state)))
         self.__simulation_state = simulation_state
 
+    def __eq__(self, other):
+        return (
+            super().__eq__(other) and
+            self.simulation_state == other.simulation_state
+        )
+
     @classmethod
     def _check_simulation_state(cls, simulation_state):
         return simulation_state in cls.SIMULATION_STATES
@@ -407,6 +431,13 @@ class EpochMessage(AbstractResultMessage):
                 new_end_time, self.start_time))
         self.__end_time = new_end_time
 
+    def __eq__(self, other):
+        return (
+            super().__eq__(other) and
+            self.start_time == other.start_time and
+            self.end_time == other.end_time
+        )
+
     @classmethod
     def _check_start_time(cls, start_time):
         return cls._check_datetime(start_time)
@@ -452,6 +483,12 @@ class StatusMessage(AbstractResultMessage):
 
         self.__value = value
 
+    def __eq__(self, other):
+        return (
+            super().__eq__(other) and
+            self.value == other.value
+        )
+
     @classmethod
     def _check_value(cls, value):
         return isinstance(value, str) and value in cls.STATUS_VALUES
@@ -490,6 +527,12 @@ class ErrorMessage(AbstractResultMessage):
             raise MessageValueError("'{:s}' is an invalid error description".format(str(description)))
 
         self.__description = description
+
+    def __eq__(self, other):
+        return (
+            super().__eq__(other) and
+            self.description == other.description
+        )
 
     @classmethod
     def _check_description(cls, description):
@@ -533,6 +576,12 @@ class ResultMessage(AbstractResultMessage):
             raise MessageValueError("'{:s}' is an invalid result value dictionary".format(str(result_values)))
 
         self.__result_values = result_values
+
+    def __eq__(self, other):
+        return (
+            super().__eq__(other) and
+            self.result_values == other.result_values
+        )
 
     @classmethod
     def _check_result_values(cls, result_values):
@@ -582,6 +631,12 @@ class GeneralMessage(AbstractMessage):
                 str(general_attributes)))
 
         self.__general_attributes = general_attributes
+
+    def __eq__(self, other):
+        return (
+            super().__eq__(other) and
+            self.general_attributes == other.general_attributes
+        )
 
     @classmethod
     def _check_general_attributes(cls, general_attributes):

@@ -41,6 +41,7 @@ from tools.tests.messages_common import DEFAULT_VALUE
 from tools.tests.messages_common import DEFAULT_DESCRIPTION
 from tools.tests.messages_common import DEFAULT_EXTRA_ATTRIBUTES
 from tools.tests.messages_common import FULL_JSON
+from tools.tests.messages_common import ALTERNATE_JSON
 
 
 class TestResultMessage(unittest.TestCase):
@@ -162,6 +163,33 @@ class TestResultMessage(unittest.TestCase):
         self.assertEqual(len(result_values_copy), len(result_values_original))
         for attribute_name in result_values_original:
             self.assertEqual(result_values_copy[attribute_name], result_values_original[attribute_name])
+
+    def test_message_equals(self):
+        """Unit test for testing if the __eq__ comparison works correctly."""
+        message_full = tools.messages.ResultMessage(Timestamp=DEFAULT_TIMESTAMP, **FULL_JSON)
+        message_copy = tools.messages.ResultMessage(Timestamp=DEFAULT_TIMESTAMP, **FULL_JSON)
+        message_alternate = tools.messages.ResultMessage.from_json(ALTERNATE_JSON)
+
+        self.assertEqual(message_copy, message_full)
+        self.assertNotEqual(message_copy, message_alternate)
+
+        attributes = [
+            "message_type",
+            "simulation_id",
+            "source_process_id",
+            "message_id",
+            "timestamp",
+            "epoch_number",
+            "last_updated_in_epoch",
+            "triggering_message_ids",
+            "warnings",
+            "result_values"
+        ]
+        for attribute_name in attributes:
+            setattr(message_copy, attribute_name, getattr(message_alternate, attribute_name))
+            self.assertNotEqual(message_copy, message_full)
+            setattr(message_copy, attribute_name, getattr(message_full, attribute_name))
+            self.assertEqual(message_copy, message_full)
 
     def test_invalid_values(self):
         """Unit tests for testing that invalid attribute values are recognized."""

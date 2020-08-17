@@ -59,6 +59,26 @@ FULL_JSON = {
     **DEFAULT_EXTRA_ATTRIBUTES
 }
 
+ALTERNATE_JSON = {
+    MESSAGE_TYPE_ATTRIBUTE: "General",
+    SIMULATION_ID_ATTRIBUTE: "2020-08-01T11:11:11.123Z",
+    SOURCE_PROCESS_ID_ATTRIBUTE: "manager",
+    MESSAGE_ID_ATTRIBUTE: "manager-123",
+    TIMESTAMP_ATTRIBUTE: "2020-08-01T11:11:11.123Z",
+    EPOCH_NUMBER_ATTRIBUTE: 157,
+    LAST_UPDATED_IN_EPOCH_ATTRIBUTE: 156,
+    TRIGGERING_MESSAGE_IDS_ATTRIBUTE: ["some-15", "other-16"],
+    WARNINGS_ATTRIBUTE: ["warning.internal"],
+    SIMULATION_STATE_ATTRIBUTE: "stopped",
+    START_TIME_ATTRIBUTE: "2001-01-01T00:15:00.000Z",
+    END_TIME_ATTRIBUTE: "2001-01-01T00:30:00.000Z",
+    VALUE_ATTRIBUTE: "ready",
+    DESCRIPTION_ATTRIBUTE: "Some error message",
+    "Extra": "extra",
+    "Extra2": 1000,
+    "Extra3": "extra-test"
+}
+
 
 class TestMessageHelpers(unittest.TestCase):
     """Unit tests for the Message class helper functions."""
