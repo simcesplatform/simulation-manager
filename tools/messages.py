@@ -144,6 +144,7 @@ class AbstractMessage():
 
     def __eq__(self, other):
         return (
+            isinstance(other, AbstractMessage) and
             self.message_type == other.message_type and
             self.simulation_id == other.simulation_id and
             self.source_process_id == other.source_process_id and
@@ -288,6 +289,7 @@ class AbstractResultMessage(AbstractMessage):
     def __eq__(self, other):
         return (
             super().__eq__(other) and
+            isinstance(other, AbstractResultMessage) and
             self.epoch_number == other.epoch_number and
             self.last_updated_in_epoch == other.last_updated_in_epoch and
             self.triggering_message_ids == other.triggering_message_ids and
@@ -368,6 +370,7 @@ class SimulationStateMessage(AbstractMessage):
     def __eq__(self, other):
         return (
             super().__eq__(other) and
+            isinstance(other, SimulationStateMessage) and
             self.simulation_state == other.simulation_state
         )
 
@@ -434,6 +437,7 @@ class EpochMessage(AbstractResultMessage):
     def __eq__(self, other):
         return (
             super().__eq__(other) and
+            isinstance(other, EpochMessage) and
             self.start_time == other.start_time and
             self.end_time == other.end_time
         )
@@ -486,6 +490,7 @@ class StatusMessage(AbstractResultMessage):
     def __eq__(self, other):
         return (
             super().__eq__(other) and
+            isinstance(other, StatusMessage) and
             self.value == other.value
         )
 
@@ -531,6 +536,7 @@ class ErrorMessage(AbstractResultMessage):
     def __eq__(self, other):
         return (
             super().__eq__(other) and
+            isinstance(other, ErrorMessage) and
             self.description == other.description
         )
 
@@ -580,6 +586,7 @@ class ResultMessage(AbstractResultMessage):
     def __eq__(self, other):
         return (
             super().__eq__(other) and
+            isinstance(other, ResultMessage) and
             self.result_values == other.result_values
         )
 
@@ -635,6 +642,7 @@ class GeneralMessage(AbstractMessage):
     def __eq__(self, other):
         return (
             super().__eq__(other) and
+            isinstance(other, GeneralMessage) and
             self.general_attributes == other.general_attributes
         )
 
