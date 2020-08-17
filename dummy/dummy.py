@@ -172,7 +172,7 @@ class DummyComponent:
                 "Received a epoch message with wrong message type: '{:s}' instead of '{:s}'".format(
                     message_object.message_type, EpochMessage.CLASS_MESSAGE_TYPE))
         elif (message_object.epoch_number == self.__latest_epoch and
-                self.__last_status_message_id in message_object.triggering_message_ids):
+              self.__last_status_message_id in message_object.triggering_message_ids):
             LOGGER.info("Status message has already been registered for epoch {:d}".format(self.__latest_epoch))
         else:
             LOGGER.debug("Received an epoch from {:s} on topic {:s}".format(
