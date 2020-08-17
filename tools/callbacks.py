@@ -6,6 +6,7 @@ import inspect
 import json
 import threading
 
+from tools.exceptions.messages import MessageError
 from tools.messages import AbstractMessage, AbstractResultMessage, EpochMessage, SimulationStateMessage, \
                            StatusMessage, MESSAGE_TYPES, DEFAULT_MESSAGE_TYPE
 from tools.tools import FullLogger
@@ -48,7 +49,7 @@ class MessageCallback():
                 self.last_message.epoch_number))
         elif isinstance(self.last_message, SimulationStateMessage):
             LOGGER.info("Received simulation state message '{:s}' from '{:s}'".format(
-                self.last_message.simulation_state, self.__last_message.source_process_id))
+                self.last_message.simulation_state, self.last_message.source_process_id))
         elif isinstance(self.last_message, EpochMessage):
             LOGGER.info("Epoch message received from '{:s}' for epoch number {:d} ({:s} - {:s})".format(
                 self.last_message.source_process_id,
@@ -64,24 +65,35 @@ class MessageCallback():
                 self.last_message.message_type,
                 self.last_message.source_process_id,
                 self.last_topic))
+        elif isinstance(self.last_message, dict):
+            LOGGER.info("Received a JSON message with errors: '{:s}'".format(json.loads(self.last_message)))
         elif self.last_message is None:
             LOGGER.warning("No last message found.")
         else:
-            LOGGER.warning("The last message is of unknown type: {:s}".format(type(self.last_message)))
+            LOGGER.warning("The last message in unknown format: '{:s}'".format(str(self.last_message)))
 
     async def callback(self, message):
         """Callback function for the received messages from the message bus."""
         with self.__lock:
-            message_str = message.body.decode(MessageCallback.MESSAGE_CODING)
-            message_json = json.loads(message_str)
+            try:
+                message_str = message.body.decode(MessageCallback.MESSAGE_CODING)
+                message_json = json.loads(message_str)
 
-            # Convert the message to the specified special cases if possible.
-            actual_message_type = message_json.get(
-                next(iter(AbstractMessage.MESSAGE_ATTRIBUTES)),  # the first defined attribute, should be "Type"
-                DEFAULT_MESSAGE_TYPE)
-            if actual_message_type not in MESSAGE_TYPES:
-                actual_message_type = DEFAULT_MESSAGE_TYPE
-            message_object = MESSAGE_TYPES[actual_message_type].from_json(message_json)
+                # Convert the message to the specified special cases if possible.
+                actual_message_type = message_json.get(
+                    next(iter(AbstractMessage.MESSAGE_ATTRIBUTES)),  # the first defined attribute, should be "Type"
+                    DEFAULT_MESSAGE_TYPE)
+                if actual_message_type not in MESSAGE_TYPES:
+                    actual_message_type = DEFAULT_MESSAGE_TYPE
+                message_object = MESSAGE_TYPES[actual_message_type].from_json(message_json)
+
+            except MessageError:
+                # The message did not conform to the simulation platform message schema.
+                message_object = message_json
+
+            except json.decoder.JSONDecodeError:
+                LOGGER.warning("Received message could not be decoded into JSON format.")
+                message_object = message_str
 
             self.__last_message = message_object
             self.__last_topic = message.routing_key
