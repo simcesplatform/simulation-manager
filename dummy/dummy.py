@@ -58,6 +58,7 @@ class DummyComponent:
         self.__latest_epoch = 0
         self.__completed_epoch = 0
         self.__triggering_message_id = ""
+        self.__last_status_message_id = None
 
         self.__end_queue = end_queue
         self.__message_id_generator = get_next_message_id(component_name)
@@ -170,6 +171,9 @@ class DummyComponent:
             LOGGER.info(
                 "Received a epoch message with wrong message type: '{:s}' instead of '{:s}'".format(
                     message_object.message_type, EpochMessage.CLASS_MESSAGE_TYPE))
+        elif (message_object.epoch_number == self.__latest_epoch and
+                self.__last_status_message_id in message_object.triggering_message_ids):
+            LOGGER.info("Status message has already been registered for epoch {:d}".format(self.__latest_epoch))
         else:
             LOGGER.debug("Received an epoch from {:s} on topic {:s}".format(
                 message_object.source_process_id, message_routing_key))
@@ -207,6 +211,7 @@ class DummyComponent:
             LOGGER.debug("Adding a warning to the status message.")
             status_message.warnings = ["warning.internal"]
 
+        self.__last_status_message_id = status_message.message_id
         return status_message.bytes()
 
     def __get_error_message(self, description):
