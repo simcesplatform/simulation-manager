@@ -201,7 +201,7 @@ class SimulationManager:
                 self.__current_start_time = self.__current_end_time
             self.__current_end_time = self.__current_start_time + datetime.timedelta(seconds=self.__epoch_length)
 
-        if self.epoch_number <= self.max_epochs:
+        if self.epoch_number <= self.max_epochs and self.__epoch_resends <= self.__max_epoch_resends:
             if new_epoch:
                 LOGGER.info("Starting Epoch {:d}".format(self.__epoch_number))
             else:
@@ -268,6 +268,7 @@ class SimulationManager:
             if self.__epoch_resends >= self.__max_epoch_resends:
                 LOGGER.info("Maximum number of epoch resends reached for epoch {:d}".format(self.__epoch_number))
                 await self.stop()
+                return
 
             self.__epoch_resends += 1
             if self.epoch_number > 0:
