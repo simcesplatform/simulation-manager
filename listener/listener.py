@@ -3,27 +3,25 @@
 """This module contains a listener simulation component that prints out all messages from the message bus."""
 
 import asyncio
-import queue
 
 from tools.clients import RabbitmqClient
-from tools.messages import AbstractMessage, SimulationStateMessage
+from tools.messages import AbstractMessage
 from tools.tools import FullLogger, load_environmental_variables
 
 LOGGER = FullLogger(__name__)
-
-TIMEOUT_INTERVAL = 15
 
 __SIMULATION_ID = "SIMULATION_ID"
 
 
 class ListenerComponent:
     """Class for the message bus listener component."""
-    def __init__(self, rabbitmq_client: RabbitmqClient, simulation_id: str, end_queue: queue.Queue):
+    LISTENED_TOPICS = "#"
+
+    def __init__(self, rabbitmq_client: RabbitmqClient, simulation_id: str):
         self.__rabbitmq_client = rabbitmq_client
         self.__simulation_id = simulation_id
-        self.__end_queue = end_queue
 
-        self.__rabbitmq_client.add_listener("#", self.simulation_message_handler)
+        self.__rabbitmq_client.add_listener(ListenerComponent.LISTENED_TOPICS, self.simulation_message_handler)
 
     @property
     def simulation_id(self):
@@ -38,40 +36,25 @@ class ListenerComponent:
                     "Received state message for a different simulation: '{:s}' instead of '{:s}'".format(
                         message_object.simulation_id, self.simulation_id))
             else:
-                LOGGER.debug("{:s} : {:s}".format(message_routing_key, str(message_object.json())))
-
-                # Check if the message is simulation ending message.
-                if (isinstance(message_object, SimulationStateMessage) and
-                        message_object.simulation_state == SimulationStateMessage.SIMULATION_STATES[-1]):
-                    LOGGER.info("Listener stopping in {:d} seconds.".format(TIMEOUT_INTERVAL))
-                    await asyncio.sleep(TIMEOUT_INTERVAL)
-                    self.__end_queue.put(None)
+                LOGGER.info("{:s} : {:s}".format(message_routing_key, str(message_object.json())))
 
         else:
             LOGGER.warning("Received '{:s}' message when expecting for '{:s}' message".format(
                 str(type(message_object)), str(AbstractMessage)))
 
 
-def start_listener_component():
+async def start_listener_component():
     """Start a listener component for the simulation platform."""
     env_variables = load_environmental_variables(
         (__SIMULATION_ID, str)
     )
 
     message_client = RabbitmqClient()
-
-    end_queue = queue.Queue()
-    ListenerComponent(
-        message_client,
-        env_variables[__SIMULATION_ID],
-        end_queue)
+    ListenerComponent(message_client, env_variables[__SIMULATION_ID])
 
     while True:
-        end_item = end_queue.get()
-        if end_item is None:
-            message_client.close()
-            break
+        await asyncio.sleep(3600)
 
 
 if __name__ == "__main__":
-    start_listener_component()
+    asyncio.run(start_listener_component())
