@@ -140,8 +140,8 @@ class RabbitmqClient:
 
         except RuntimeError as error:
             LOGGER.warning("RunTimeError: '{:s}' when trying to publish message.".format(str(error)))
-        except ConnectionError as error:
-            LOGGER.warning("ConnectionError: '{:s}' when trying to publish message.".format(str(error)))
+        except OSError as error:
+            LOGGER.warning("OSError: '{:s}' when trying to publish message.".format(str(error)))
 
     @classmethod
     def listener_thread(cls, connection_parameters, exchange_name, topic_names, callback_class):
@@ -193,8 +193,8 @@ class RabbitmqClient:
 
             except RuntimeError as error:
                 LOGGER.warning("RuntimeError: '{:s}' when trying to listen to the message bus.".format(str(error)))
-            except ConnectionError as error:
-                LOGGER.warning("ConnectionError: '{:s}' when trying to publish message.".format(str(error)))
+            except OSError as error:
+                LOGGER.warning("OSError: '{:s}' when trying to listen to the message bus.".format(str(error)))
 
     @classmethod
     def __get_connection_parameters_only(cls, connection_config_dict):

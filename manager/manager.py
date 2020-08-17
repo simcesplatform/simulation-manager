@@ -32,6 +32,7 @@ __SIMULATION_INITIAL_START_TIME = "SIMULATION_INITIAL_START_TIME"
 __SIMULATION_EPOCH_LENGTH = "SIMULATION_EPOCH_LENGTH"
 __SIMULATION_MAX_EPOCHS = "SIMULATION_MAX_EPOCHS"
 __SIMULATION_EPOCH_TIMER_INTERVAL = "SIMULATION_EPOCH_TIMER_INTERVAL"
+__SIMULATION_MAX_EPOCH_RESENDS = "SIMULATION_MAX_EPOCH_RESENDS"
 
 
 class SimulationManager:
@@ -42,7 +43,7 @@ class SimulationManager:
     STATUS_MESSAGE_VALUE_OK = StatusMessage.STATUS_VALUES[0]
 
     def __init__(self, rabbitmq_client, simulation_id, manager_name, simulation_components,
-                 initial_start_time, epoch_length, max_epochs, epoch_timer_interval,
+                 initial_start_time, epoch_length, max_epochs, epoch_timer_interval, max_epoch_resends,
                  epoch_topic, state_topic, status_topic, error_topic, end_queue):
         self.__rabbitmq_client = rabbitmq_client
         self.__simulation_id = simulation_id
@@ -55,6 +56,8 @@ class SimulationManager:
         self.__max_epochs = max_epochs
         self.__epoch_timer_interval = epoch_timer_interval
         self.__epoch_timer = None
+        self.__max_epoch_resends = max_epoch_resends
+        self.__epoch_resends = 0
 
         self.__current_start_time = to_utc_datetime_object(initial_start_time)
         self.__current_end_time = None
@@ -193,6 +196,7 @@ class SimulationManager:
         """Sends an epoch message to the message bus."""
         if new_epoch or self.epoch_number == 0:
             self.__epoch_number += 1
+            self.__epoch_resends = 0
             if self.__current_end_time is not None:
                 self.__current_start_time = self.__current_end_time
             self.__current_end_time = self.__current_start_time + datetime.timedelta(seconds=self.__epoch_length)
@@ -201,7 +205,8 @@ class SimulationManager:
             if new_epoch:
                 LOGGER.info("Starting Epoch {:d}".format(self.__epoch_number))
             else:
-                LOGGER.info("Resending epoch message for Epoch {:d}".format(self.__epoch_number))
+                LOGGER.info("Resending (try {:d}) epoch message for Epoch {:d}".format(
+                    self.__epoch_resends, self.__epoch_number))
 
             new_epoch_message = self.__get_epoch_message()
             await self.__rabbitmq_client.send_message(self.__epoch_topic, new_epoch_message)
@@ -244,7 +249,10 @@ class SimulationManager:
     async def __start_epoch_timer(self):
         """Starts the epoch timer."""
         await self.__stop_epoch_timer()
-        self.__epoch_timer = Timer(False, self.__epoch_timer_interval, self.__epoch_timer_handler)
+        self.__epoch_timer = Timer(
+            False,
+            self.__epoch_timer_interval * (self.__epoch_resends + 1),
+            self.__epoch_timer_handler)
 
     async def __stop_epoch_timer(self):
         """Starts the epoch timer."""
@@ -257,6 +265,11 @@ class SimulationManager:
         The function resends the epoch message for the current epoch,
         or the simulation state message at the beginning of the simulation."""
         if self.get_simulation_state() == SimulationManager.SIMULATION_STATE_VALUE_RUNNING:
+            if self.__epoch_resends >= self.__max_epoch_resends:
+                LOGGER.info("Maximum number of epoch resends reached for epoch {:d}".format(self.__epoch_number))
+                await self.stop()
+
+            self.__epoch_resends += 1
             if self.epoch_number > 0:
                 await self.__send_epoch_message(new_epoch=False)
             else:
@@ -276,7 +289,8 @@ async def start_manager():
         (__SIMULATION_EPOCH_LENGTH, int, 3600),
         (__SIMULATION_INITIAL_START_TIME, str, "2020-01-01T00:00:00.000Z"),
         (__SIMULATION_MAX_EPOCHS, int, 5),
-        (__SIMULATION_EPOCH_TIMER_INTERVAL, int, 120)
+        (__SIMULATION_EPOCH_TIMER_INTERVAL, int, 120),
+        (__SIMULATION_MAX_EPOCH_RESENDS, int, 5)
     )
 
     simulation_components = SimulationComponents()
@@ -296,6 +310,7 @@ async def start_manager():
         max_epochs=env_variables[__SIMULATION_MAX_EPOCHS],
         epoch_timer_interval=env_variables[__SIMULATION_EPOCH_TIMER_INTERVAL],
         epoch_topic=env_variables[__SIMULATION_EPOCH_MESSAGE_TOPIC],
+        max_epoch_resends=env_variables[__SIMULATION_MAX_EPOCH_RESENDS],
         state_topic=env_variables[__SIMULATION_STATE_MESSAGE_TOPIC],
         status_topic=env_variables[__SIMULATION_STATUS_MESSAGE_TOPIC],
         error_topic=env_variables[__SIMULATION_ERROR_MESSAGE_TOPIC],
