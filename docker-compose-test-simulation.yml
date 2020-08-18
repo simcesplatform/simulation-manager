@@ -109,7 +109,6 @@ services:
 
 volumes:
   simulation_logs:
-    external: true
     name: simulation_logs
 
 networks:
