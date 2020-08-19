@@ -12,8 +12,9 @@ services:
     env_file:
       - rabbitmq.env
     networks:
-     - rabbitmq_network
+      - rabbitmq_network
 
 networks:
   rabbitmq_network:
     name: rabbitmq_network
+    external: true

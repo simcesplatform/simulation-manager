@@ -15,7 +15,7 @@ services:
     volumes:
       - simulation_logs:/logs
     networks:
-     - rabbitmq_network
+      - rabbitmq_network
 
 volumes:
   simulation_logs:
@@ -25,3 +25,4 @@ volumes:
 networks:
   rabbitmq_network:
     name: rabbitmq_network
+    external: true

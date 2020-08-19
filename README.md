@@ -28,6 +28,7 @@ git -c http.sslVerify=false pull --recurse-submodules
 Edit the username and password in the file [`rabbitmq/rabbitmq.env`](rabbitmq/rabbitmq.env)
 
 ```bash
+docker network create rabbitmq_network
 docker-compose -f rabbitmq/docker-compose-rabbitmq.yml up --detach
 ```
 
@@ -35,7 +36,10 @@ docker-compose -f rabbitmq/docker-compose-rabbitmq.yml up --detach
 
 Edit the files [`common.env`](common.env), [`simulation_manager.env`](simulation_manager.env), [`dummy.env`](dummy.env), and [`docker-compose-test-simulation.yml`](docker-compose-test-simulation.yml) files with the parameters you want. At least [`common.env`](common.env) needs to be edited with the correct username and password for the RabbitMQ server.
 
+Running the `create_new_simulation.id` script creates new simulation id based on the current time and inserts it to the configuration files.
+
 ```bash
+source create_new_simulation_id.sh
 docker-compose -f docker-compose-test-simulation.yml up --build
 ```
 
