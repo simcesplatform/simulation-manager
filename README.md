@@ -11,6 +11,14 @@ git -c http.sslVerify=false clone --recursive https://git.ain.rd.tut.fi/procempl
 
 ## Pulling changes to previously cloned repository
 
+Cloning the submodules for repository that does not yet have them:
+
+```bash
+git -c http.sslVerify=false clone submodule update --init --recursive
+```
+
+Pulling changes to both this repository and all the submodules:
+
 ```bash
 git -c http.sslVerify=false pull --recurse-submodules
 ```
