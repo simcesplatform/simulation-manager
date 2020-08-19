@@ -1,6 +1,19 @@
 # Simulation Manager
 
-Omega, Simulation Manager and dummy components for the simulation platform.
+Implementation of the simulation manager component as well as dummy components for the simulation platform.
+The simulation manager handles the starting and ending of the simulation, [Simulation Manager](https://wiki.eduuni.fi/display/tuniSimCES/Simulation+Manager), and starting simulation epochs when all simulation components are ready for a new epoch, [Omega](https://wiki.eduuni.fi/display/tuniSimCES/Omega).
+
+## Cloning the repository
+
+```bash
+git -c http.sslVerify=false clone --recursive https://git.ain.rd.tut.fi/procemplus/simulation-manager.git
+```
+
+## Pulling changes to previously cloned repository
+
+```bash
+git -c http.sslVerify=false pull --recurse-submodules
+```
 
 ## Start local RabbitMQ server
 
