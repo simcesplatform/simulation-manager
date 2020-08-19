@@ -1,0 +1,3 @@
+[submodule "simulation-tools"]
+	path = simulation-tools
+	url = https://git.ain.rd.tut.fi/procemplus/simulation-tools.git
