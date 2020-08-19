@@ -1,6 +1,7 @@
 FROM python:3.7.3
 
 RUN mkdir -p /tests/dummy
+RUN mkdir -p /tests/init
 RUN mkdir -p /tests/listener
 RUN mkdir -p /tests/manager
 RUN mkdir -p /tests/simulation-tools
@@ -9,8 +10,8 @@ COPY requirements.txt /requirements.txt
 RUN pip install --upgrade pip
 RUN pip install -r /requirements.txt
 
-COPY sub_modules.py /tests/sub_modules.py
 COPY dummy/ /tests/dummy/
+COPY init/ /tests/init/
 COPY listener/ tests/listener/
 COPY manager/ /tests/manager/
 COPY simulation-tools/ /tests/simulation-tools/
