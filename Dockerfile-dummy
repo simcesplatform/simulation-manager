@@ -1,15 +1,16 @@
 FROM python:3.7.3
 
 RUN mkdir -p /dummy
-RUN mkdir -p /tools
 RUN mkdir -p /logs
+RUN mkdir -p /simulation-tools
 
 COPY requirements.txt /requirements.txt
 RUN pip install --upgrade pip
 RUN pip install -r /requirements.txt
 
+COPY sub_modules.py /sub_modules.py
 COPY dummy/ /dummy/
-COPY tools/ /tools/
+COPY simulation-tools/ /simulation-tools/
 
 WORKDIR /
 

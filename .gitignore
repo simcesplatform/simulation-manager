@@ -2,3 +2,4 @@ __pycache__
 .vscode
 logfile.log
 logs/*.log
+python_libraries.env
