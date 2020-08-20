@@ -23,6 +23,12 @@ Pulling changes to both this repository and all the submodules:
 git -c http.sslVerify=false pull --recurse-submodules
 ```
 
+To prevent any local changes made to the configuration files containing usernames or passwords showing with `git status`:
+
+```bash
+git update-index --skip-worktree env/common.env rabbitmq/rabbitmq.env
+```
+
 ## Start local RabbitMQ server
 
 Edit the username and password in the file [`rabbitmq/rabbitmq.env`](rabbitmq/rabbitmq.env)
