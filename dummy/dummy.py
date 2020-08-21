@@ -3,16 +3,29 @@
 """This module contains a dummy simulation component that has very simple internal logic."""
 
 import asyncio
+import datetime
 import queue
 import random
 
 from tools.clients import RabbitmqClient
-from tools.messages import EpochMessage, ErrorMessage, StatusMessage, SimulationStateMessage, get_next_message_id
+from tools.messages import EpochMessage, ErrorMessage, ResultMessage, StatusMessage, SimulationStateMessage, \
+                           get_next_message_id
+from tools.timeseries import TimeSeriesAttribute, TimeSeriesBlock
 from tools.tools import FullLogger, load_environmental_variables
 
 LOGGER = FullLogger(__name__)
 
 TIMEOUT_INTERVAL = 10
+
+# these settings are used in determining the composition of the result messages
+ATTRIBUTE_NAME_SIMPLE_VALUES = ["DummyValue", "TestValue"]
+ATTRIBUTE_NAME_TIME_SERIES = ["Current", "Voltage"]
+ATTRIBUTE_TYPE_TIME_SERIES = ["A", "V"]
+TIME_SERIES_ATTRIBUTES = ["L1", "L2", "L3"]
+TIME_SERIES_INTERVAL = datetime.timedelta(minutes=30)
+TIME_SERIES_LENGTH = 12
+ATTRIBUTE_VALUE_MIN = 0
+ATTRIBUTE_VALUE_MAX = 1000
 
 __SIMULATION_ID = "SIMULATION_ID"
 __SIMULATION_COMPONENT_NAME = "SIMULATION_COMPONENT_NAME"
@@ -20,6 +33,7 @@ __SIMULATION_EPOCH_MESSAGE_TOPIC = "SIMULATION_EPOCH_MESSAGE_TOPIC"
 __SIMULATION_STATUS_MESSAGE_TOPIC = "SIMULATION_STATUS_MESSAGE_TOPIC"
 __SIMULATION_STATE_MESSAGE_TOPIC = "SIMULATION_STATE_MESSAGE_TOPIC"
 __SIMULATION_ERROR_MESSAGE_TOPIC = "SIMULATION_ERROR_MESSAGE_TOPIC"
+__SIMULATION_RESULT_MESSAGE_TOPIC = "SIMULATION_RESULT_MESSAGE_TOPIC"
 
 __MIN_SLEEP_TIME = "MIN_SLEEP_TIME"
 __MAX_SLEEP_TIME = "MAX_SLEEP_TIME"
@@ -36,7 +50,7 @@ class DummyComponent:
     SIMULATION_STATE_VALUE_STOPPED = SimulationStateMessage.SIMULATION_STATES[-1]  # "stopped"
 
     def __init__(self, rabbitmq_client, simulation_id, component_name,
-                 simulation_state_topic, epoch_topic, status_topic, error_topic, min_delay, max_delay,
+                 simulation_state_topic, epoch_topic, status_topic, error_topic, result_topic, min_delay, max_delay,
                  error_chance, send_miss_chance, receive_miss_chance, warning_chance, end_queue):
         self.__rabbitmq_client = rabbitmq_client
         self.__simulation_id = simulation_id
@@ -46,6 +60,7 @@ class DummyComponent:
         self.__epoch_topic = epoch_topic
         self.__status_topic = status_topic
         self.__error_topic = error_topic
+        self.__result_topic = result_topic
 
         self.__min_delay = min_delay
         self.__max_delay = max_delay
@@ -106,7 +121,7 @@ class DummyComponent:
                 await asyncio.sleep(TIMEOUT_INTERVAL)
                 self.__end_queue.put(None)
 
-    async def start_epoch(self, epoch_number):
+    async def start_epoch(self, epoch_number, start_time):
         """Starts a new epoch for the component. Sends a status message when finished."""
         if self.__simulation_state == DummyComponent.SIMULATION_STATE_VALUE_RUNNING:
             self.__latest_epoch = epoch_number
@@ -126,7 +141,9 @@ class DummyComponent:
                 LOGGER.info("Component {:s} sending status message for epoch {:d} in {:d} seconds.".format(
                     self.__component_name, self.__latest_epoch, rand_wait_time))
                 await asyncio.sleep(rand_wait_time)
-            await self.__send_new_status_message()
+
+                await self.__send_random_result_message(start_time)
+                await self.__send_new_status_message()
 
     async def general_message_handler(self, message_object, message_routing_key):
         """Forwards the message handling to the appropriate function depending on the message type."""
@@ -178,7 +195,7 @@ class DummyComponent:
             LOGGER.debug("Received an epoch from {:s} on topic {:s}".format(
                 message_object.source_process_id, message_routing_key))
             self.__triggering_message_id = message_object.message_id
-            await self.start_epoch(message_object.epoch_number)
+            await self.start_epoch(message_object.epoch_number, message_object.start_time)
 
     async def __send_new_status_message(self):
         new_status_message = self.__get_status_message()
@@ -194,6 +211,10 @@ class DummyComponent:
     async def __send_error_message(self, description):
         error_message = self.__get_error_message(description)
         await self.__rabbitmq_client.send_message(self.__error_topic, error_message)
+
+    async def __send_random_result_message(self, start_time):
+        random_result_message = self.__get_result_message(start_time)
+        await self.__rabbitmq_client.send_message(self.__result_topic, random_result_message)
 
     def __get_status_message(self):
         status_message = StatusMessage(**{
@@ -229,6 +250,43 @@ class DummyComponent:
 
         return error_message.bytes()
 
+    def __get_result_message(self, start_time):
+        result_message = ResultMessage.from_json({
+            "Type": ResultMessage.CLASS_MESSAGE_TYPE,
+            "SimulationId": self.simulation_id,
+            "SourceProcessId": self.component_name,
+            "MessageId": next(self.__message_id_generator),
+            "EpochNumber": self.__latest_epoch,
+            "TriggeringMessageIds": [self.__triggering_message_id]
+        })
+        if result_message is None:
+            LOGGER.error("Problem with creating a result message")
+
+        # Probably quite unreadable way to produce randomly generated data for the result message.
+        result_message.result_values = {
+            **{
+                simple_attribute: random.randint(ATTRIBUTE_VALUE_MIN, ATTRIBUTE_VALUE_MAX)
+                for simple_attribute in ATTRIBUTE_NAME_SIMPLE_VALUES
+            },
+            **{
+                timeseries_attribute: TimeSeriesBlock(
+                    start_time,
+                    TIME_SERIES_INTERVAL,
+                    **{
+                        phase_name: TimeSeriesAttribute(
+                            value_unit,
+                            [
+                                random.randint(ATTRIBUTE_VALUE_MIN, ATTRIBUTE_VALUE_MAX)
+                                for _ in range(1, TIME_SERIES_LENGTH + 1)
+                            ])
+                        for phase_name in TIME_SERIES_ATTRIBUTES
+                    }).json()
+                for timeseries_attribute, value_unit in zip(ATTRIBUTE_NAME_TIME_SERIES, ATTRIBUTE_TYPE_TIME_SERIES)
+            }
+        }
+
+        return result_message.bytes()
+
 
 async def start_dummy_component():
     """Start a dummy component for the simulation platform."""
@@ -239,6 +297,7 @@ async def start_dummy_component():
         (__SIMULATION_STATUS_MESSAGE_TOPIC, str, "status"),
         (__SIMULATION_STATE_MESSAGE_TOPIC, str, "state"),
         (__SIMULATION_ERROR_MESSAGE_TOPIC, str, "error"),
+        (__SIMULATION_RESULT_MESSAGE_TOPIC, str, "result"),
         (__MIN_SLEEP_TIME, int, 2),
         (__MAX_SLEEP_TIME, int, 15),
         (__ERROR_CHANCE, float, 0.0),
@@ -258,6 +317,7 @@ async def start_dummy_component():
         epoch_topic=env_variables[__SIMULATION_EPOCH_MESSAGE_TOPIC],
         status_topic=env_variables[__SIMULATION_STATUS_MESSAGE_TOPIC],
         error_topic=env_variables[__SIMULATION_ERROR_MESSAGE_TOPIC],
+        result_topic=env_variables[__SIMULATION_RESULT_MESSAGE_TOPIC],
         min_delay=env_variables[__MIN_SLEEP_TIME],
         max_delay=env_variables[__MAX_SLEEP_TIME],
         error_chance=env_variables[__ERROR_CHANCE],
