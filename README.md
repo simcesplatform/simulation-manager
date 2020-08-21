@@ -21,6 +21,7 @@ Pulling changes to both this repository and all the submodules:
 
 ```bash
 git -c http.sslVerify=false pull --recurse-submodules
+git -c http.sslVerify=false submodule update --remote
 ```
 
 To prevent any local changes made to the configuration files containing usernames or passwords showing with `git status`:
