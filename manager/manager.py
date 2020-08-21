@@ -27,6 +27,8 @@ __SIMULATION_STATE_MESSAGE_TOPIC = "SIMULATION_STATE_MESSAGE_TOPIC"
 __SIMULATION_ERROR_MESSAGE_TOPIC = "SIMULATION_ERROR_MESSAGE_TOPIC"
 
 __SIMULATION_COMPONENTS = "SIMULATION_COMPONENTS"
+__SIMULATION_NAME = "SIMULATION_NAME"
+__SIMULATION_DESCRIPTION = "SIMULATION_DESCRIPTION"
 
 __SIMULATION_INITIAL_START_TIME = "SIMULATION_INITIAL_START_TIME"
 __SIMULATION_EPOCH_LENGTH = "SIMULATION_EPOCH_LENGTH"
@@ -43,12 +45,15 @@ class SimulationManager:
     STATUS_MESSAGE_VALUE_OK = StatusMessage.STATUS_VALUES[0]
 
     def __init__(self, rabbitmq_client, simulation_id, manager_name, simulation_components,
+                 simulation_name, simulation_description,
                  initial_start_time, epoch_length, max_epochs, epoch_timer_interval, max_epoch_resends,
                  epoch_topic, state_topic, status_topic, error_topic, end_queue):
         self.__rabbitmq_client = rabbitmq_client
         self.__simulation_id = simulation_id
         self.__manager_name = manager_name
         self.__simulation_components = simulation_components
+        self.__simulation_name = simulation_name
+        self.__simulation_description = simulation_description
 
         self.__simulation_state = SimulationManager.SIMULATION_STATE_VALUE_STOPPED
         self.__epoch_number = 0
@@ -222,7 +227,9 @@ class SimulationManager:
             "SimulationId": self.simulation_id,
             "SourceProcessId": self.manager_name,
             "MessageId": next(self.__message_id_generator),
-            "SimulationState": self.get_simulation_state()
+            "SimulationState": self.get_simulation_state(),
+            "Name": self.__simulation_name,
+            "Description": self.__simulation_description
         })
         if state_message is None:
             LOGGER.error("Problem with creating a simulation state message")
@@ -283,6 +290,8 @@ async def start_manager():
         (__SIMULATION_ID, str),
         (__SIMULATION_MANAGER_NAME, str, "manager"),
         (__SIMULATION_COMPONENTS, str, ""),
+        (__SIMULATION_NAME, str, ""),
+        (__SIMULATION_DESCRIPTION, str, ""),
         (__SIMULATION_EPOCH_MESSAGE_TOPIC, str, "epoch"),
         (__SIMULATION_STATUS_MESSAGE_TOPIC, str, "status"),
         (__SIMULATION_STATE_MESSAGE_TOPIC, str, "state"),
@@ -306,6 +315,8 @@ async def start_manager():
         simulation_id=env_variables[__SIMULATION_ID],
         manager_name=env_variables[__SIMULATION_MANAGER_NAME],
         simulation_components=simulation_components,
+        simulation_name=env_variables[__SIMULATION_NAME],
+        simulation_description=env_variables[__SIMULATION_DESCRIPTION],
         initial_start_time=env_variables[__SIMULATION_INITIAL_START_TIME],
         epoch_length=env_variables[__SIMULATION_EPOCH_LENGTH],
         max_epochs=env_variables[__SIMULATION_MAX_EPOCHS],
