@@ -8,6 +8,7 @@ import queue
 import random
 
 from tools.clients import RabbitmqClient
+from tools.datetime_tools import to_utc_datetime_object
 from tools.messages import EpochMessage, ErrorMessage, ResultMessage, StatusMessage, SimulationStateMessage, \
                            get_next_message_id
 from tools.timeseries import TimeSeriesAttribute, TimeSeriesBlock
@@ -23,7 +24,7 @@ ATTRIBUTE_NAME_TIME_SERIES = ["Current", "Voltage"]
 ATTRIBUTE_TYPE_TIME_SERIES = ["A", "V"]
 TIME_SERIES_ATTRIBUTES = ["L1", "L2", "L3"]
 TIME_SERIES_INTERVAL = datetime.timedelta(minutes=30)
-TIME_SERIES_LENGTH = 12
+TIME_SERIES_LENGTH = 6
 ATTRIBUTE_VALUE_MIN = 0
 ATTRIBUTE_VALUE_MAX = 1000
 
@@ -270,20 +271,24 @@ class DummyComponent:
             },
             **{
                 timeseries_attribute: TimeSeriesBlock(
-                    start_time,
-                    TIME_SERIES_INTERVAL,
-                    **{
+                    TimeIndex=[
+                        to_utc_datetime_object(start_time) + index * TIME_SERIES_INTERVAL
+                        for index in range(TIME_SERIES_LENGTH)
+                    ],
+                    Series={
                         phase_name: TimeSeriesAttribute(
-                            value_unit,
-                            [
+                            UnitOfMeasure=value_unit,
+                            Values=[
                                 random.randint(ATTRIBUTE_VALUE_MIN, ATTRIBUTE_VALUE_MAX)
-                                for _ in range(1, TIME_SERIES_LENGTH + 1)
+                                for _ in range(TIME_SERIES_LENGTH)
                             ])
                         for phase_name in TIME_SERIES_ATTRIBUTES
-                    }).json()
+                    })
                 for timeseries_attribute, value_unit in zip(ATTRIBUTE_NAME_TIME_SERIES, ATTRIBUTE_TYPE_TIME_SERIES)
             }
         }
+        print(result_message.simulation_id)
+        print(result_message.result_values)
 
         return result_message.bytes()
 
