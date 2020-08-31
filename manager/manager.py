@@ -4,7 +4,7 @@
 
 import asyncio
 import datetime
-import queue
+import sys
 
 from manager.components import SimulationComponents
 from tools.clients import RabbitmqClient
@@ -47,7 +47,7 @@ class SimulationManager:
     def __init__(self, rabbitmq_client, simulation_id, manager_name, simulation_components,
                  simulation_name, simulation_description,
                  initial_start_time, epoch_length, max_epochs, epoch_timer_interval, max_epoch_resends,
-                 epoch_topic, state_topic, status_topic, error_topic, end_queue):
+                 epoch_topic, state_topic, status_topic, error_topic):
         self.__rabbitmq_client = rabbitmq_client
         self.__simulation_id = simulation_id
         self.__manager_name = manager_name
@@ -71,7 +71,6 @@ class SimulationManager:
         self.__state_topic = state_topic
         self.__status_topic = status_topic
         self.__error_topic = error_topic
-        self.__end_queue = end_queue
 
         self.__message_id_generator = get_next_message_id(self.manager_name)
 
@@ -130,7 +129,7 @@ class SimulationManager:
                 LOGGER.info("Simulation manager '{:s}' stopping in {:d} seconds.".format(
                     self.__manager_name, TIMEOUT_INTERVAL))
                 await asyncio.sleep(TIMEOUT_INTERVAL)
-                self.__end_queue.put(None)
+                sys.exit()
 
     async def check_components(self):
         """Checks the status of the simulation components and sends a new epoch message if needed."""
@@ -309,7 +308,6 @@ async def start_manager():
 
     message_client = RabbitmqClient()
 
-    end_queue = queue.Queue()
     manager = SimulationManager(
         rabbitmq_client=message_client,
         simulation_id=env_variables[__SIMULATION_ID],
@@ -325,19 +323,14 @@ async def start_manager():
         max_epoch_resends=env_variables[__SIMULATION_MAX_EPOCH_RESENDS],
         state_topic=env_variables[__SIMULATION_STATE_MESSAGE_TOPIC],
         status_topic=env_variables[__SIMULATION_STATUS_MESSAGE_TOPIC],
-        error_topic=env_variables[__SIMULATION_ERROR_MESSAGE_TOPIC],
-        end_queue=end_queue)
+        error_topic=env_variables[__SIMULATION_ERROR_MESSAGE_TOPIC])
 
     # wait a bit to allow other components to initialize and then start the simulation
     await asyncio.sleep(TIMEOUT_INTERVAL)
     await manager.start()
 
     while True:
-        end_item = end_queue.get()
-        if end_item is None:
-            LOGGER.info("Closing the simulation manager: '{:s}'".format(manager.manager_name))
-            message_client.close()
-            break
+        await asyncio.sleep(10 * TIMEOUT_INTERVAL)
 
 
 if __name__ == "__main__":

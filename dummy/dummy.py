@@ -4,8 +4,8 @@
 
 import asyncio
 import datetime
-import queue
 import random
+import sys
 
 from tools.clients import RabbitmqClient
 from tools.datetime_tools import to_utc_datetime_object
@@ -52,7 +52,7 @@ class DummyComponent:
 
     def __init__(self, rabbitmq_client, simulation_id, component_name,
                  simulation_state_topic, epoch_topic, status_topic, error_topic, result_topic, min_delay, max_delay,
-                 error_chance, send_miss_chance, receive_miss_chance, warning_chance, end_queue):
+                 error_chance, send_miss_chance, receive_miss_chance, warning_chance):
         self.__rabbitmq_client = rabbitmq_client
         self.__simulation_id = simulation_id
         self.__component_name = component_name
@@ -76,7 +76,6 @@ class DummyComponent:
         self.__triggering_message_id = ""
         self.__last_status_message_id = None
 
-        self.__end_queue = end_queue
         self.__message_id_generator = get_next_message_id(component_name)
 
         self.__rabbitmq_client.add_listener(
@@ -120,7 +119,7 @@ class DummyComponent:
                 LOGGER.info("Component {:s} stopping in {:d} seconds.".format(
                     self.__component_name, TIMEOUT_INTERVAL))
                 await asyncio.sleep(TIMEOUT_INTERVAL)
-                self.__end_queue.put(None)
+                sys.exit()
 
     async def start_epoch(self, epoch_number, start_time):
         """Starts a new epoch for the component. Sends a status message when finished."""
@@ -287,8 +286,6 @@ class DummyComponent:
                 for timeseries_attribute, value_unit in zip(ATTRIBUTE_NAME_TIME_SERIES, ATTRIBUTE_TYPE_TIME_SERIES)
             }
         }
-        print(result_message.simulation_id)
-        print(result_message.result_values)
 
         return result_message.bytes()
 
@@ -313,7 +310,6 @@ async def start_dummy_component():
 
     message_client = RabbitmqClient()
 
-    end_queue = queue.Queue()
     dummy_component = DummyComponent(
         rabbitmq_client=message_client,
         simulation_id=env_variables[__SIMULATION_ID],
@@ -328,14 +324,10 @@ async def start_dummy_component():
         error_chance=env_variables[__ERROR_CHANCE],
         send_miss_chance=env_variables[__SEND_MISS_CHANCE],
         receive_miss_chance=env_variables[__RECEIVE_MISS_CHANCE],
-        warning_chance=env_variables[__WARNING_CHANCE],
-        end_queue=end_queue)
+        warning_chance=env_variables[__WARNING_CHANCE])
 
     while True:
-        end_item = end_queue.get()
-        if end_item is None:
-            message_client.close()
-            break
+        await asyncio.sleep(10 * TIMEOUT_INTERVAL)
 
 
 if __name__ == "__main__":
