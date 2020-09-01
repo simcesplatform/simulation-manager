@@ -15,10 +15,9 @@ for component_name in ${components}
 do
     for log_writer_container in $(docker ps | grep ${component_name} --max-count=1 | cut --delimiter=' ' --fields=1)
     do
-        echo "docker-compose --file docker-compose-env.yml down ${component_name}"
-        # docker-compose --file docker-compose-env.yml down ${component_name}
+        docker-compose --file docker-compose-full.yml down ${component_name}
     done
 done
 
 # Start a new simulation
-docker-compose --file docker-compose-env.yml up --detach
+docker-compose --file docker-compose-full.yml up --detach

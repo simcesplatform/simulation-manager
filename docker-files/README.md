@@ -21,7 +21,7 @@ The docker-compose file assumes that the LogReader repository is at folder `logr
 6. Copy the script [`start_simulation.sh`](start_simulation.sh), the docker-compose file, [`docker-compose-env.yml`](docker-compose-env.yml), and the entire [`env`](env) folder to the root folder of the different repositories.
 
     ```bash
-    cp -r start_simulation.sh docker-compose-env.yml env ../..
+    cp -r start_simulation.sh docker-compose-full.yml env ../..
     ```
 
 ## Starting the simulation
