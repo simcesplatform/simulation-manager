@@ -13,9 +13,9 @@ done
 components="log_writer manager dummy_1 dummy_2 dummy_3 dummy_4 dummy_5"
 for component_name in ${components}
 do
-    for log_writer_container in $(docker ps | grep ${component_name} --max-count=1 | cut --delimiter=' ' --fields=1)
+    for container_id in $(docker ps | grep ${component_name} --max-count=1 | cut --delimiter=' ' --fields=1)
     do
-        docker-compose --file docker-compose-full.yml down ${component_name}
+        docker stop ${container_id}
     done
 done
 
