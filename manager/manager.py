@@ -5,11 +5,13 @@
 import asyncio
 import datetime
 import sys
+from typing import Any, Union
 
 from manager.components import SimulationComponents
 from tools.clients import RabbitmqClient
 from tools.datetime_tools import to_utc_datetime_object
-from tools.messages import EpochMessage, ErrorMessage, StatusMessage, SimulationStateMessage, get_next_message_id
+from tools.messages import AbstractMessage, EpochMessage, ErrorMessage, StatusMessage, SimulationStateMessage, \
+                          get_next_message_id
 from tools.timer import Timer
 from tools.tools import FullLogger, load_environmental_variables
 
@@ -147,7 +149,7 @@ class SimulationManager:
         new_simulation_state_message = self.__get_simulation_state_message()
         await self.__rabbitmq_client.send_message(self.__state_topic, new_simulation_state_message)
 
-    async def general_message_handler(self, message_object, message_routing_key):
+    async def general_message_handler(self, message_object: Union[AbstractMessage, Any], message_routing_key: str):
         """Forwards the message handling to the appropriate function depending on the message type."""
         if isinstance(message_object, StatusMessage):
             await self.status_message_handler(message_object, message_routing_key)

@@ -49,9 +49,12 @@ async def start_listener_component():
         (__SIMULATION_ID, str)
     )
 
-    message_client = RabbitmqClient()
-    ListenerComponent(message_client, env_variables[__SIMULATION_ID])
+    simulation_id = env_variables[__SIMULATION_ID]
+    if not isinstance(simulation_id, str):
+        LOGGER.error("No simulation id found.")
+        return
 
+    ListenerComponent(RabbitmqClient(), simulation_id)
     while True:
         await asyncio.sleep(3600)
 
