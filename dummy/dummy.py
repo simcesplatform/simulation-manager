@@ -3,30 +3,19 @@
 """This module contains a dummy simulation component that has very simple internal logic."""
 
 import asyncio
-import datetime
 import random
 import sys
+from typing import Any, Union
 
+from dummy.random_series import get_all_random_series, get_latest_values, get_random_initial_values
 from tools.clients import RabbitmqClient
-from tools.datetime_tools import to_utc_datetime_object
-from tools.messages import EpochMessage, ErrorMessage, ResultMessage, StatusMessage, SimulationStateMessage, \
-                           get_next_message_id
-from tools.timeseries import TimeSeriesAttribute, TimeSeriesBlock
+from tools.messages import AbstractMessage, EpochMessage, ErrorMessage, ResultMessage, StatusMessage, \
+                           SimulationStateMessage, get_next_message_id
 from tools.tools import FullLogger, load_environmental_variables
 
 LOGGER = FullLogger(__name__)
 
 TIMEOUT_INTERVAL = 10
-
-# these settings are used in determining the composition of the result messages
-ATTRIBUTE_NAME_SIMPLE_VALUES = ["DummyValue", "TestValue"]
-ATTRIBUTE_NAME_TIME_SERIES = ["Current", "Voltage"]
-ATTRIBUTE_TYPE_TIME_SERIES = ["A", "V"]
-TIME_SERIES_ATTRIBUTES = ["L1", "L2", "L3"]
-TIME_SERIES_INTERVAL = datetime.timedelta(minutes=30)
-TIME_SERIES_LENGTH = 6
-ATTRIBUTE_VALUE_MIN = 0
-ATTRIBUTE_VALUE_MAX = 1000
 
 __SIMULATION_ID = "SIMULATION_ID"
 __SIMULATION_COMPONENT_NAME = "SIMULATION_COMPONENT_NAME"
@@ -85,6 +74,9 @@ class DummyComponent:
             ],
             self.general_message_handler)
 
+        # Setup the first values of the randomly generated time series for the result messages.
+        self.__last_result_values = get_random_initial_values()
+
     @property
     def simulation_id(self):
         """The simulation ID for the simulation."""
@@ -104,7 +96,7 @@ class DummyComponent:
         """Returns the simulation state attribute."""
         return self.__simulation_state
 
-    async def set_simulation_state(self, new_simulation_state):
+    async def set_simulation_state(self, new_simulation_state: str):
         """Sets the simulation state. If the new simulation state is "running" and the current epoch is 0,
            sends a status message to the message bus.
            If the new simulation state is "stopped", stops the dummy component."""
@@ -121,7 +113,7 @@ class DummyComponent:
                 await asyncio.sleep(TIMEOUT_INTERVAL)
                 sys.exit()
 
-    async def start_epoch(self, epoch_number, start_time):
+    async def start_epoch(self, epoch_number: int, start_time: str, end_time: str):
         """Starts a new epoch for the component. Sends a status message when finished."""
         if self.__simulation_state == DummyComponent.SIMULATION_STATE_VALUE_RUNNING:
             self.__latest_epoch = epoch_number
@@ -142,10 +134,10 @@ class DummyComponent:
                     self.__component_name, self.__latest_epoch, rand_wait_time))
                 await asyncio.sleep(rand_wait_time)
 
-                await self.__send_random_result_message(start_time)
+                await self.__send_random_result_message(start_time, end_time)
                 await self.__send_new_status_message()
 
-    async def general_message_handler(self, message_object, message_routing_key):
+    async def general_message_handler(self, message_object: Union[AbstractMessage, Any], message_routing_key: str):
         """Forwards the message handling to the appropriate function depending on the message type."""
         if isinstance(message_object, SimulationStateMessage):
             await self.simulation_state_message_handler(message_object, message_routing_key)
@@ -162,7 +154,7 @@ class DummyComponent:
             LOGGER.warning("Received '{:s}' message when expecting for '{:s}' or '{:s}' message".format(
                 str(type(message_object)), str(SimulationStateMessage), str(EpochMessage)))
 
-    async def simulation_state_message_handler(self, message_object, message_routing_key):
+    async def simulation_state_message_handler(self, message_object: SimulationStateMessage, message_routing_key: str):
         """Handles the received simulation state messages."""
         if message_object.simulation_id != self.simulation_id:
             LOGGER.info(
@@ -178,7 +170,7 @@ class DummyComponent:
             self.__triggering_message_id = message_object.message_id
             await self.set_simulation_state(message_object.simulation_state)
 
-    async def epoch_message_handler(self, message_object, message_routing_key):
+    async def epoch_message_handler(self, message_object: EpochMessage, message_routing_key: str):
         """Handles the received epoch messages."""
         if message_object.simulation_id != self.simulation_id:
             LOGGER.info(
@@ -195,7 +187,8 @@ class DummyComponent:
             LOGGER.debug("Received an epoch from {:s} on topic {:s}".format(
                 message_object.source_process_id, message_routing_key))
             self.__triggering_message_id = message_object.message_id
-            await self.start_epoch(message_object.epoch_number, message_object.start_time)
+
+            await self.start_epoch(message_object.epoch_number, message_object.start_time, message_object.end_time)
 
     async def __send_new_status_message(self):
         new_status_message = self.__get_status_message()
@@ -208,15 +201,15 @@ class DummyComponent:
 
         self.__completed_epoch = self.__latest_epoch
 
-    async def __send_error_message(self, description):
+    async def __send_error_message(self, description: str):
         error_message = self.__get_error_message(description)
         await self.__rabbitmq_client.send_message(self.__error_topic, error_message)
 
-    async def __send_random_result_message(self, start_time):
-        random_result_message = self.__get_result_message(start_time)
+    async def __send_random_result_message(self, start_time: str, end_time: str):
+        random_result_message = self.__get_result_message(start_time, end_time)
         await self.__rabbitmq_client.send_message(self.__result_topic, random_result_message)
 
-    def __get_status_message(self):
+    def __get_status_message(self) -> bytes:
         status_message = StatusMessage(**{
             "Type": StatusMessage.CLASS_MESSAGE_TYPE,
             "SimulationId": self.simulation_id,
@@ -235,7 +228,7 @@ class DummyComponent:
         self.__last_status_message_id = status_message.message_id
         return status_message.bytes()
 
-    def __get_error_message(self, description):
+    def __get_error_message(self, description: str):
         error_message = ErrorMessage(**{
             "Type": ErrorMessage.CLASS_MESSAGE_TYPE,
             "SimulationId": self.simulation_id,
@@ -250,7 +243,7 @@ class DummyComponent:
 
         return error_message.bytes()
 
-    def __get_result_message(self, start_time):
+    def __get_result_message(self, start_time: str, end_time: str) -> bytes:
         result_message = ResultMessage.from_json({
             "Type": ResultMessage.CLASS_MESSAGE_TYPE,
             "SimulationId": self.simulation_id,
@@ -262,31 +255,10 @@ class DummyComponent:
         if result_message is None:
             LOGGER.error("Problem with creating a result message")
 
-        # Probably quite unreadable way to produce randomly generated data for the result message.
-        result_message.result_values = {
-            **{
-                simple_attribute: random.randint(ATTRIBUTE_VALUE_MIN, ATTRIBUTE_VALUE_MAX)
-                for simple_attribute in ATTRIBUTE_NAME_SIMPLE_VALUES
-            },
-            **{
-                timeseries_attribute: TimeSeriesBlock(
-                    TimeIndex=[
-                        to_utc_datetime_object(start_time) + index * TIME_SERIES_INTERVAL
-                        for index in range(TIME_SERIES_LENGTH)
-                    ],
-                    Series={
-                        phase_name: TimeSeriesAttribute(
-                            UnitOfMeasure=value_unit,
-                            Values=[
-                                random.randint(ATTRIBUTE_VALUE_MIN, ATTRIBUTE_VALUE_MAX)
-                                for _ in range(TIME_SERIES_LENGTH)
-                            ])
-                        for phase_name in TIME_SERIES_ATTRIBUTES
-                    })
-                for timeseries_attribute, value_unit in zip(ATTRIBUTE_NAME_TIME_SERIES, ATTRIBUTE_TYPE_TIME_SERIES)
-            }
-        }
+        new_random_series_collection = get_all_random_series(self.__last_result_values, start_time, end_time)
+        self.__last_result_values = get_latest_values(new_random_series_collection)
 
+        result_message.result_values = new_random_series_collection
         return result_message.bytes()
 
 
