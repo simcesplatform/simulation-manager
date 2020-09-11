@@ -4,4 +4,3 @@
 logfile.log
 logs/*.log
 python_libraries.env
-pyrightconfig.json
