@@ -15,8 +15,10 @@ from tools.tools import FullLogger, load_environmental_variables
 
 LOGGER = FullLogger(__name__)
 
+# The time interval in seconds that is waited before closing after receiving simulation state message "stopped".
 TIMEOUT_INTERVAL = 10
 
+# The names of the environmental variables used by the component.
 __SIMULATION_ID = "SIMULATION_ID"
 __SIMULATION_COMPONENT_NAME = "SIMULATION_COMPONENT_NAME"
 __SIMULATION_EPOCH_MESSAGE_TOPIC = "SIMULATION_EPOCH_MESSAGE_TOPIC"
@@ -39,10 +41,10 @@ class DummyComponent:
     SIMULATION_STATE_VALUE_RUNNING = SimulationStateMessage.SIMULATION_STATES[0]   # "running"
     SIMULATION_STATE_VALUE_STOPPED = SimulationStateMessage.SIMULATION_STATES[-1]  # "stopped"
 
-    def __init__(self, rabbitmq_client, simulation_id, component_name,
-                 simulation_state_topic, epoch_topic, status_topic, error_topic, result_topic, min_delay, max_delay,
-                 error_chance, send_miss_chance, receive_miss_chance, warning_chance):
-        self.__rabbitmq_client = rabbitmq_client
+    def __init__(self, simulation_id, component_name,
+                 simulation_state_topic, epoch_topic, status_topic, error_topic, result_topic,
+                 min_delay, max_delay, error_chance, send_miss_chance, receive_miss_chance, warning_chance):
+        self.__rabbitmq_client = RabbitmqClient()
         self.__simulation_id = simulation_id
         self.__component_name = component_name
 
@@ -124,10 +126,13 @@ class DummyComponent:
                 await self.__send_new_status_message()
                 return
 
+            # Simulate an error possibility by using the random error chanche setting.
             rand_error_chance = random.random()
             if rand_error_chance < self.__error_chance:
                 LOGGER.error("Encountered a random error.")
                 await self.__send_error_message("Random error")
+
+            # No errors, do normal epoch handling.
             else:
                 rand_wait_time = random.randint(self.__min_delay, self.__max_delay)
                 LOGGER.info("Component {:s} sending status message for epoch {:d} in {:d} seconds.".format(
@@ -143,13 +148,13 @@ class DummyComponent:
             await self.simulation_state_message_handler(message_object, message_routing_key)
             return
 
-        if random.random() < self.__receive_miss_chance:
-            # Simulate a connection error by not receiving an epoch message.
-            LOGGER.warning("Received message was ignored.")
-            return
-
         if isinstance(message_object, EpochMessage):
+            if random.random() < self.__receive_miss_chance:
+                # Simulate a connection error by not receiving an epoch message.
+                LOGGER.warning("Received message was ignored.")
+                return
             await self.epoch_message_handler(message_object, message_routing_key)
+
         else:
             LOGGER.warning("Received '{:s}' message when expecting for '{:s}' or '{:s}' message".format(
                 str(type(message_object)), str(SimulationStateMessage), str(EpochMessage)))
@@ -191,7 +196,11 @@ class DummyComponent:
             await self.start_epoch(message_object.epoch_number, message_object.start_time, message_object.end_time)
 
     async def __send_new_status_message(self):
+        """Sends a new status message to the message bus."""
         new_status_message = self.__get_status_message()
+        if new_status_message is None:
+            await self.__send_error_message("Internal error when creating status message.")
+            return
 
         if self.__latest_epoch > 0 and random.random() < self.__send_miss_chance:
             # simulate connection error by not sending the status message for an epoch
@@ -202,14 +211,26 @@ class DummyComponent:
         self.__completed_epoch = self.__latest_epoch
 
     async def __send_error_message(self, description: str):
+        """Sends an error message to the message bus."""
         error_message = self.__get_error_message(description)
-        await self.__rabbitmq_client.send_message(self.__error_topic, error_message)
+        if error_message is None:
+            # So serious error that even the error message could not be created => stop the component.
+            await self.stop()
+
+        else:
+            await self.__rabbitmq_client.send_message(self.__error_topic, error_message)
 
     async def __send_random_result_message(self, start_time: str, end_time: str):
+        """Sends a result message with random values and time series to the message bus."""
         random_result_message = self.__get_result_message(start_time, end_time)
-        await self.__rabbitmq_client.send_message(self.__result_topic, random_result_message)
+        if random_result_message is None:
+            await self.__send_error_message("Internal error when creating result message.")
+        else:
+            await self.__rabbitmq_client.send_message(self.__result_topic, random_result_message)
 
-    def __get_status_message(self) -> bytes:
+    def __get_status_message(self) -> Union[bytes, None]:
+        """Creates a new status message and returns it in bytes format.
+           Returns None, if there was a problem creating the message."""
         status_message = StatusMessage(**{
             "Type": StatusMessage.CLASS_MESSAGE_TYPE,
             "SimulationId": self.simulation_id,
@@ -221,14 +242,18 @@ class DummyComponent:
         })
         if status_message is None:
             LOGGER.error("Problem with creating a status message")
-        elif random.random() < self.__warning_chance:
+            return None
+
+        if random.random() < self.__warning_chance:
             LOGGER.debug("Adding a warning to the status message.")
             status_message.warnings = ["warning.internal"]
 
         self.__last_status_message_id = status_message.message_id
         return status_message.bytes()
 
-    def __get_error_message(self, description: str):
+    def __get_error_message(self, description: str) -> Union[bytes, None]:
+        """Creates a new error message and returns it in bytes format.
+           Returns None, if there was a problem creating the message."""
         error_message = ErrorMessage(**{
             "Type": ErrorMessage.CLASS_MESSAGE_TYPE,
             "SimulationId": self.simulation_id,
@@ -240,10 +265,13 @@ class DummyComponent:
         })
         if error_message is None:
             LOGGER.error("Problem with creating an error message")
+            return None
 
         return error_message.bytes()
 
-    def __get_result_message(self, start_time: str, end_time: str) -> bytes:
+    def __get_result_message(self, start_time: str, end_time: str) -> Union[bytes, None]:
+        """Creates a new result message and returns it in bytes format.
+           Returns None, if there was a problem creating the message."""
         result_message = ResultMessage.from_json({
             "Type": ResultMessage.CLASS_MESSAGE_TYPE,
             "SimulationId": self.simulation_id,
@@ -254,6 +282,7 @@ class DummyComponent:
         })
         if result_message is None:
             LOGGER.error("Problem with creating a result message")
+            return None
 
         new_random_series_collection = get_all_random_series(self.__last_result_values, start_time, end_time)
         self.__last_result_values = get_latest_values(new_random_series_collection)
@@ -264,6 +293,8 @@ class DummyComponent:
 
 async def start_dummy_component():
     """Start a dummy component for the simulation platform."""
+
+    # Load the environmental variables to a dictionary.
     env_variables = load_environmental_variables(
         (__SIMULATION_ID, str),
         (__SIMULATION_COMPONENT_NAME, str, "dummy"),
@@ -280,10 +311,7 @@ async def start_dummy_component():
         (__WARNING_CHANCE, float, 0.0)
     )
 
-    message_client = RabbitmqClient()
-
-    dummy_component = DummyComponent(
-        rabbitmq_client=message_client,
+    DummyComponent(
         simulation_id=env_variables[__SIMULATION_ID],
         component_name=env_variables[__SIMULATION_COMPONENT_NAME],
         simulation_state_topic=env_variables[__SIMULATION_STATE_MESSAGE_TOPIC],
@@ -298,6 +326,7 @@ async def start_dummy_component():
         receive_miss_chance=env_variables[__RECEIVE_MISS_CHANCE],
         warning_chance=env_variables[__WARNING_CHANCE])
 
+    # Wait in an endless loop until the DummyComponent is stopped and sys.exit() is called.
     while True:
         await asyncio.sleep(10 * TIMEOUT_INTERVAL)
 

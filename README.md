@@ -64,6 +64,8 @@ docker attach listener_component
 docker-compose -f docker_tests/docker-compose-tests.yml up --build
 ```
 
+Only unit test for the manager and dummy component are run. To run the unit tests defined in the simulation-tools submodule go into the the simulation-tools folder and follow the instructions there.
+
 ## Stop running simulation
 
 ```bash
