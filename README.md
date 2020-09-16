@@ -35,7 +35,7 @@ The simulation manager handles the starting and ending of the simulation, [Simul
     - [listener](listener)
         - A simple message bus listener component for testing purposes. The basis of the listener part for the LogWriter.
     - [simulation-tools](tools)
-        - The helper library [simulation-tools](https://git.ain.rd.tut.fi/procemplus/simulation-tools) as a Git submodule. See [simulation-tools/README.md](simulation-tools/README.md) for the contents of the helper library.
+        - The helper library [simulation-tools](https://git.ain.rd.tut.fi/procemplus/simulation-tools) as a Git submodule. See [README.md](https://git.ain.rd.tut.fi/procemplus/simulation-tools/-/blob/master/README.md) for information about the contents of the helper library.
     - [init](init)
         - Init file that adds the submodule simulation-tools to the python path to allow the other code easy access to the tools library.
     - [env](env)
