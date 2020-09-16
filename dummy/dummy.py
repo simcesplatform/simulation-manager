@@ -5,7 +5,7 @@
 import asyncio
 import random
 import sys
-from typing import Any, Union
+from typing import cast, Any, Union
 
 from dummy.random_series import get_all_random_series, get_latest_values, get_random_initial_values
 from tools.clients import RabbitmqClient
@@ -41,9 +41,9 @@ class DummyComponent:
     SIMULATION_STATE_VALUE_RUNNING = SimulationStateMessage.SIMULATION_STATES[0]   # "running"
     SIMULATION_STATE_VALUE_STOPPED = SimulationStateMessage.SIMULATION_STATES[-1]  # "stopped"
 
-    def __init__(self, simulation_id, component_name,
-                 simulation_state_topic, epoch_topic, status_topic, error_topic, result_topic,
-                 min_delay, max_delay, error_chance, send_miss_chance, receive_miss_chance, warning_chance):
+    def __init__(self, simulation_id: str, component_name: str, simulation_state_topic: str, epoch_topic: str,
+                 status_topic: str, error_topic: str, result_topic: str, min_delay: float, max_delay: float,
+                 error_chance: float, send_miss_chance: float, receive_miss_chance: float, warning_chance: float):
         self.__rabbitmq_client = RabbitmqClient()
         self.__simulation_id = simulation_id
         self.__component_name = component_name
@@ -134,7 +134,7 @@ class DummyComponent:
 
             # No errors, do normal epoch handling.
             else:
-                rand_wait_time = random.randint(self.__min_delay, self.__max_delay)
+                rand_wait_time = random.uniform(self.__min_delay, self.__max_delay)
                 LOGGER.info("Component {:s} sending status message for epoch {:d} in {:d} seconds.".format(
                     self.__component_name, self.__latest_epoch, rand_wait_time))
                 await asyncio.sleep(rand_wait_time)
@@ -303,8 +303,8 @@ async def start_dummy_component():
         (__SIMULATION_STATE_MESSAGE_TOPIC, str, "state"),
         (__SIMULATION_ERROR_MESSAGE_TOPIC, str, "error"),
         (__SIMULATION_RESULT_MESSAGE_TOPIC, str, "result"),
-        (__MIN_SLEEP_TIME, int, 2),
-        (__MAX_SLEEP_TIME, int, 15),
+        (__MIN_SLEEP_TIME, float, 2),
+        (__MAX_SLEEP_TIME, float, 15),
         (__ERROR_CHANCE, float, 0.0),
         (__SEND_MISS_CHANCE, float, 0.0),
         (__RECEIVE_MISS_CHANCE, float, 0.0),
@@ -312,19 +312,19 @@ async def start_dummy_component():
     )
 
     DummyComponent(
-        simulation_id=env_variables[__SIMULATION_ID],
-        component_name=env_variables[__SIMULATION_COMPONENT_NAME],
-        simulation_state_topic=env_variables[__SIMULATION_STATE_MESSAGE_TOPIC],
-        epoch_topic=env_variables[__SIMULATION_EPOCH_MESSAGE_TOPIC],
-        status_topic=env_variables[__SIMULATION_STATUS_MESSAGE_TOPIC],
-        error_topic=env_variables[__SIMULATION_ERROR_MESSAGE_TOPIC],
-        result_topic=env_variables[__SIMULATION_RESULT_MESSAGE_TOPIC],
-        min_delay=env_variables[__MIN_SLEEP_TIME],
-        max_delay=env_variables[__MAX_SLEEP_TIME],
-        error_chance=env_variables[__ERROR_CHANCE],
-        send_miss_chance=env_variables[__SEND_MISS_CHANCE],
-        receive_miss_chance=env_variables[__RECEIVE_MISS_CHANCE],
-        warning_chance=env_variables[__WARNING_CHANCE])
+        simulation_id=cast(str, env_variables[__SIMULATION_ID]),
+        component_name=cast(str, env_variables[__SIMULATION_COMPONENT_NAME]),
+        simulation_state_topic=cast(str, env_variables[__SIMULATION_STATE_MESSAGE_TOPIC]),
+        epoch_topic=cast(str, env_variables[__SIMULATION_EPOCH_MESSAGE_TOPIC]),
+        status_topic=cast(str, env_variables[__SIMULATION_STATUS_MESSAGE_TOPIC]),
+        error_topic=cast(str, env_variables[__SIMULATION_ERROR_MESSAGE_TOPIC]),
+        result_topic=cast(str, env_variables[__SIMULATION_RESULT_MESSAGE_TOPIC]),
+        min_delay=cast(float, env_variables[__MIN_SLEEP_TIME]),
+        max_delay=cast(float, env_variables[__MAX_SLEEP_TIME]),
+        error_chance=cast(float, env_variables[__ERROR_CHANCE]),
+        send_miss_chance=cast(float, env_variables[__SEND_MISS_CHANCE]),
+        receive_miss_chance=cast(float, env_variables[__RECEIVE_MISS_CHANCE]),
+        warning_chance=cast(float, env_variables[__WARNING_CHANCE]))
 
     # Wait in an endless loop until the DummyComponent is stopped and sys.exit() is called.
     while True:
