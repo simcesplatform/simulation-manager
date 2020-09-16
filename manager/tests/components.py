@@ -67,6 +67,9 @@ class TestSimulationComponents(unittest.TestCase):
         component_names_expect_last = new_component_names[:len(new_component_names)-1]
         component_names_expect_middle = new_component_names[:len(new_component_names) // 2] + \
             new_component_names[len(new_component_names) // 2 + 1:]
+
+        # Define which components send ready messages at which epochs.
+        # The tuple format is (component_name_list, expected_last_full_epoch).
         ready_messages = {
             0: (new_component_names, 0),
             1: (component_names_expect_first, 0),
