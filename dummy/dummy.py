@@ -135,7 +135,7 @@ class DummyComponent:
             # No errors, do normal epoch handling.
             else:
                 rand_wait_time = random.uniform(self.__min_delay, self.__max_delay)
-                LOGGER.info("Component {:s} sending status message for epoch {:d} in {:d} seconds.".format(
+                LOGGER.info("Component {:s} sending status message for epoch {:d} in {:f} seconds.".format(
                     self.__component_name, self.__latest_epoch, rand_wait_time))
                 await asyncio.sleep(rand_wait_time)
 
