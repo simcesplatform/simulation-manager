@@ -6,7 +6,11 @@ import random
 from typing import Dict, List, Union
 
 from tools.datetime_tools import to_utc_datetime_object
+from tools.exceptions.timeseries import TimeSeriesError
 from tools.timeseries import TimeSeriesAttribute, TimeSeriesBlock
+from tools.tools import FullLogger
+
+LOGGER = FullLogger(__name__)
 
 ATTRIBUTE_TYPE_SIMPLE = "simple"
 ATTRIBUTE_TYPE_TIMESERIES = "timeseries"
@@ -27,7 +31,7 @@ RANDOM_ATTRIBUTES = {
     "Current": {
         "type": ATTRIBUTE_TYPE_TIMESERIES,
         "sub_types": ["L1", "L2", "L3"],
-        "unit": "A",
+        "unit": "uA",
         "min": 0.0,
         "max": 100.0,
         "max_difference": 5.0,
@@ -92,9 +96,10 @@ def get_random_time_series(random_attribute_name: str, start_values: Dict[str, f
             max_difference=random_attribute_definition["max_difference"])
         start_values[sub_attribute] = new_random_series[-1]
 
-        random_series_collection[sub_attribute] = TimeSeriesAttribute(
-            UnitOfMeasure=random_attribute_definition["unit"],
-            Values=new_random_series)
+        random_series_collection[sub_attribute] = TimeSeriesAttribute.from_json({
+            "UnitOfMeasure": random_attribute_definition["unit"],
+            "Values": new_random_series
+        })
 
     start_time_object = to_utc_datetime_object(start_time)
     end_time_object = to_utc_datetime_object(end_time)
@@ -104,9 +109,10 @@ def get_random_time_series(random_attribute_name: str, start_values: Dict[str, f
         for index in range(0, random_attribute_definition["time_parts"] + 1)
     ]
 
-    return TimeSeriesBlock(
-        TimeIndex=time_index,
-        Series=random_series_collection)
+    return TimeSeriesBlock.from_json({
+        "TimeIndex": time_index,
+        "Series": random_series_collection
+    })
 
 
 def get_all_random_series(start_values: Dict[str, Dict[str, float]],
@@ -128,7 +134,12 @@ def get_all_random_series(start_values: Dict[str, Dict[str, float]],
 
 def get_latest_values(random_series_collection: Dict[str, Union[float, TimeSeriesBlock]]) \
         -> Dict[str, Dict[str, float]]:
-    """Returns a dictionary containing the latest values for all the series in the collection."""
+    """Returns a dictionary containing the latest values for all the series in the collection.
+       Raises TimeseriesError if not all attributes are included in the given random_series_collection."""
+    for random_attribute in RANDOM_ATTRIBUTES:
+        if random_attribute not in random_series_collection:
+            raise TimeSeriesError("Missing attribute: {:s}".format(random_attribute))
+
     latest_values = {}
     for attribute_name, attribute_values in random_series_collection.items():
         if isinstance(attribute_values, TimeSeriesBlock):

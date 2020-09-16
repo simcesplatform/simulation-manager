@@ -9,6 +9,7 @@ from typing import cast, Any, Union
 
 from dummy.random_series import get_all_random_series, get_latest_values, get_random_initial_values
 from tools.clients import RabbitmqClient
+from tools.exceptions.timeseries import TimeSeriesError
 from tools.messages import AbstractMessage, EpochMessage, ErrorMessage, ResultMessage, StatusMessage, \
                            SimulationStateMessage, get_next_message_id
 from tools.tools import FullLogger, load_environmental_variables
@@ -231,7 +232,7 @@ class DummyComponent:
     def __get_status_message(self) -> Union[bytes, None]:
         """Creates a new status message and returns it in bytes format.
            Returns None, if there was a problem creating the message."""
-        status_message = StatusMessage(**{
+        status_message = StatusMessage.from_json({
             "Type": StatusMessage.CLASS_MESSAGE_TYPE,
             "SimulationId": self.simulation_id,
             "SourceProcessId": self.component_name,
@@ -254,7 +255,7 @@ class DummyComponent:
     def __get_error_message(self, description: str) -> Union[bytes, None]:
         """Creates a new error message and returns it in bytes format.
            Returns None, if there was a problem creating the message."""
-        error_message = ErrorMessage(**{
+        error_message = ErrorMessage.from_json({
             "Type": ErrorMessage.CLASS_MESSAGE_TYPE,
             "SimulationId": self.simulation_id,
             "SourceProcessId": self.component_name,
@@ -284,10 +285,14 @@ class DummyComponent:
             LOGGER.error("Problem with creating a result message")
             return None
 
-        new_random_series_collection = get_all_random_series(self.__last_result_values, start_time, end_time)
-        self.__last_result_values = get_latest_values(new_random_series_collection)
+        try:
+            new_random_series_collection = get_all_random_series(self.__last_result_values, start_time, end_time)
+            self.__last_result_values = get_latest_values(new_random_series_collection)
+            result_message.result_values = new_random_series_collection
+        except TimeSeriesError:
+            LOGGER.error("Error when creating values for result message")
+            return None
 
-        result_message.result_values = new_random_series_collection
         return result_message.bytes()
 
 

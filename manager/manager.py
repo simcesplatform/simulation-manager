@@ -244,7 +244,7 @@ class SimulationManager:
     def __get_simulation_state_message(self) -> Union[bytes, None]:
         """Creates a new simulation state message and returns it in bytes format.
            If there is a problem creating the message, returns None."""
-        state_message = SimulationStateMessage(**{
+        state_message = SimulationStateMessage.from_json({
             "Type": SimulationStateMessage.CLASS_MESSAGE_TYPE,
             "SimulationId": self.simulation_id,
             "SourceProcessId": self.manager_name,
@@ -262,7 +262,7 @@ class SimulationManager:
     def __get_epoch_message(self) -> Union[bytes, None]:
         """Creates a new epoch message and returns it in bytes format.
            If there is a problem creating the message, returns None."""
-        epoch_message = EpochMessage(**{
+        epoch_message = EpochMessage.from_json({
             "Type": EpochMessage.CLASS_MESSAGE_TYPE,
             "SimulationId": self.simulation_id,
             "SourceProcessId": self.manager_name,
