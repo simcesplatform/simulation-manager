@@ -116,8 +116,8 @@ class DummyComponent(AbstractSimulationComponent):
         if self._latest_epoch > 0 and random.random() < self._send_miss_chance:
             # simulate connection error by not sending the status message for an epoch
             LOGGER.warning("No status message sent this time.")
-
-        await super().send_status_message()
+        else:
+            await super().send_status_message()
 
     async def _send_random_result_message(self):
         """Sends a result message with random values and time series to the message bus."""
