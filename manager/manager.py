@@ -4,7 +4,6 @@
 
 import asyncio
 import datetime
-import sys
 from typing import cast, Any, Union
 
 from manager.components import SimulationComponents
@@ -57,6 +56,7 @@ class SimulationManager:
         self.__manager_name = manager_name
         self.__simulation_name = simulation_name
         self.__simulation_description = simulation_description
+        self.__is_stopped = True
 
         self.__simulation_components = SimulationComponents()
         for component_name in cast(str, simulation_components.split(",")):
@@ -90,16 +90,25 @@ class SimulationManager:
             ],
             self.general_message_handler)
 
+    @property
+    def is_stopped(self) -> bool:
+        """Returns True, if the simulation is stopped."""
+        return self.__is_stopped
+
     async def start(self):
         """Starts the simulation. Sends a simulation state message."""
         LOGGER.info("Starting the simulation.")
         await self.set_simulation_state(SimulationManager.SIMULATION_STATE_VALUE_RUNNING)
+        self.__is_stopped = False
 
     async def stop(self):
         """Stops the simulation. Sends a simulation state message to the message bus."""
         LOGGER.info("Stopping the simulation.")
         await self.__stop_epoch_timer()
-        await self.set_simulation_state(SimulationManager.SIMULATION_STATE_VALUE_STOPPED)
+        self.__simulation_state = SimulationManager.SIMULATION_STATE_VALUE_STOPPED
+        await self.send_state_message()
+        await self.__rabbitmq_client.close()
+        self.__is_stopped = True
 
     @property
     def simulation_id(self) -> str:
@@ -132,13 +141,13 @@ class SimulationManager:
                 SimulationManager.SIMULATION_STATE_VALUE_RUNNING,
                 SimulationManager.SIMULATION_STATE_VALUE_STOPPED):
             self.__simulation_state = new_simulation_state
-            await self.send_state_message()
-
-            if new_simulation_state == SimulationManager.SIMULATION_STATE_VALUE_STOPPED:
-                LOGGER.info("Simulation manager '{:s}' stopping in {:d} seconds.".format(
-                    self.__manager_name, TIMEOUT_INTERVAL))
-                await asyncio.sleep(TIMEOUT_INTERVAL)
-                sys.exit()
+            if new_simulation_state == SimulationManager.SIMULATION_STATE_VALUE_RUNNING:
+                await self.send_state_message()
+            elif new_simulation_state == SimulationManager.SIMULATION_STATE_VALUE_STOPPED:
+                # LOGGER.info("Simulation manager '{:s}' stopping in {:d} seconds.".format(
+                #     self.__manager_name, TIMEOUT_INTERVAL))
+                # await asyncio.sleep(TIMEOUT_INTERVAL)
+                self.stop()
 
     async def check_components(self):
         """Checks the status of the simulation components and sends a new epoch message if needed."""
@@ -157,7 +166,7 @@ class SimulationManager:
         if new_simulation_state_message is None:
             # So serious error that even the simulation state message could not be created => stop the manager.
             LOGGER.error("Simulation manager exiting due to internal error")
-            sys.exit()
+            self.stop()
         else:
             await self.__rabbitmq_client.send_message(self.__state_topic, new_simulation_state_message)
 
@@ -350,9 +359,12 @@ async def start_manager():
     await asyncio.sleep(TIMEOUT_INTERVAL)
     await manager.start()
 
-    # Wait in an endless loop until the SimulationManager is stopped and sys.exit() is called.
-    while True:
-        await asyncio.sleep(10 * TIMEOUT_INTERVAL)
+    # Wait in an endless loop until the SimulationManager is stopped or sys.exit() is called.
+    while not manager.is_stopped:
+        await asyncio.sleep(TIMEOUT_INTERVAL)
+
+    # Wait a few seconds extra to allow for certain the last simulation state message to be sent.
+    await asyncio.sleep(TIMEOUT_INTERVAL / 2)
 
 
 if __name__ == "__main__":

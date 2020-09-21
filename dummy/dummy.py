@@ -86,7 +86,7 @@ class DummyComponent(AbstractSimulationComponent):
 
         # No errors, do normal epoch handling.
         rand_wait_time = random.uniform(self._min_delay, self._max_delay)
-        LOGGER.info("Component {:s} sending status message for epoch {:d} in {:f} seconds.".format(
+        LOGGER.info("Component {:s} sending status message for epoch {:d} in {:.1f} seconds.".format(
             self.component_name, self._latest_epoch, rand_wait_time))
         await asyncio.sleep(rand_wait_time)
 
@@ -174,9 +174,9 @@ async def start_dummy_component():
     await asyncio.sleep(TIMEOUT_INTERVAL)
     await dummy_component.start()
 
-    # Wait in an endless loop until the DummyComponent is stopped and sys.exit() is called.
-    while True:
-        await asyncio.sleep(100 * TIMEOUT_INTERVAL)
+    # Wait in an endless loop until the DummyComponent is stopped or sys.exit() is called.
+    while not dummy_component.is_stopped:
+        await asyncio.sleep(TIMEOUT_INTERVAL)
 
 
 if __name__ == "__main__":
