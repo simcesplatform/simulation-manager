@@ -31,7 +31,7 @@ RANDOM_ATTRIBUTES = {
     "Current": {
         "type": ATTRIBUTE_TYPE_TIMESERIES,
         "sub_types": ["L1", "L2", "L3"],
-        "unit": "uA",
+        "unit": "A",
         "min": 0.0,
         "max": 100.0,
         "max_difference": 5.0,

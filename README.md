@@ -109,6 +109,8 @@ docker attach listener_component
 ## Run unit tests
 
 ```bash
+docker network create manager_test_network
+docker-compose -f docker_tests/docker-compose-rabbitmq.yml up --detach
 docker-compose -f docker_tests/docker-compose-tests.yml up --build
 ```
 

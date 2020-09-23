@@ -10,10 +10,16 @@ services:
     container_name: simulation_manager_tests
     restart: "no"
     environment:
+      - RABBITMQ_HOST=rabbitmq_manager_tests
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_SSL=false
+      - RABBITMQ_EXCHANGE=procem.simulation_manager_exchange
       - SIMULATION_LOG_LEVEL=50
+      - SIMULATION_ID=2010-12-31T23:59:59.999Z
+      - SIMULATION_COMPONENT_NAME=test_dummy
     networks:
-      - test_network
+      - manager_test_network
 
 networks:
-  test_network:
-    name: test_network
+  manager_test_network:
+    name: manager_test_network

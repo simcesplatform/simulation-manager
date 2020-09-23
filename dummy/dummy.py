@@ -42,7 +42,7 @@ class DummyComponent(AbstractSimulationComponent):
 
         # Load the dummy component specific environmental variables.
         env_variables = load_environmental_variables(
-            (SIMULATION_RESULT_MESSAGE_TOPIC, str, "result"),
+            (SIMULATION_RESULT_MESSAGE_TOPIC, str, "Result"),
             (MIN_SLEEP_TIME, float, 2),
             (MAX_SLEEP_TIME, float, 15),
             (ERROR_CHANCE, float, 0.0),
