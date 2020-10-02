@@ -15,4 +15,4 @@ do
     docker cp ${container}:${container_log_folder}/${log_file_name}.${log_file_type} ${local_log_folder}
 done
 
-docker-compose -f logs/docker-compose-logs.yml down --remove-orphans
+docker-compose -f docker-compose-logs.yml down --remove-orphans
