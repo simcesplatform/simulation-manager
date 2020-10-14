@@ -11,6 +11,9 @@ from tools.messages import AbstractMessage, ResultMessage
 # Importing TestAbstractSimulationComponent means that also those unit tests
 # will be run when running the unit test in this repository.
 from tools.tests.components import MessageGenerator, TestAbstractSimulationComponent
+from tools.tools import FullLogger
+
+LOGGER = FullLogger(__name__)
 
 
 def compare_values(value1: Any, value2: Any) -> bool:
@@ -63,13 +66,23 @@ class MessageGeneratorExtended(MessageGenerator):
         return result_message
 
 
+def dummy_component_creator(message: str) -> DummyComponent:
+    """An example of using a creator function with Test class. Returns a new Dummy component."""
+    if message.lower() == "hello":
+        # NOTE: the default log level setting for running the unit tests is critical only
+        LOGGER.info("Hello from component_creator!")
+    return DummyComponent()
+
+
 # Use TestAbstractSimulationComponent as a base class to define the unit tests.
 class TestDummyComponent(TestAbstractSimulationComponent):
     """Unit tests for sending and receiving messages using DummyComponent object."""
-    component_type = DummyComponent
+    component_creator = dummy_component_creator
+    component_creator_params = {"message": "hello"}
     message_generator_type = MessageGeneratorExtended
+    normal_simulation_epochs = 12
     short_wait = 0.5
-    long_wait = 5.0
+    long_wait = 2.5
 
     os.environ["MIN_SLEEP_TIME"] = "0"
     os.environ["MAX_SLEEP_TIME"] = "0"
@@ -84,11 +97,11 @@ class TestDummyComponent(TestAbstractSimulationComponent):
            generate at epoch epoch_number, epoch 0 corresponds to the start of the simulation."""
         if epoch_number == 0:
             return [
-                (component_message_generator.get_status_message(epoch_number, triggering_message_ids), "Status")
+                (component_message_generator.get_status_message(epoch_number, triggering_message_ids), "Status.Ready")
             ]
         return [
             (component_message_generator.get_result_message(epoch_number, triggering_message_ids), "Result"),
-            (component_message_generator.get_status_message(epoch_number, triggering_message_ids), "Status")
+            (component_message_generator.get_status_message(epoch_number, triggering_message_ids), "Status.Ready")
         ]
 
     def compare_result_message(self, first_message: ResultMessage, second_message: ResultMessage):
