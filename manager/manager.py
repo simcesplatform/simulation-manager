@@ -208,24 +208,6 @@ class SimulationManager:
                 await self.stop()
             await self.check_components()
 
-    # async def error_message_handler(self, message_object: StatusMessage, message_routing_key: str):
-    #     """Handles received error messages. After receiving a proper error message, stops the simulation."""
-    #     if message_object.simulation_id != self.simulation_id:
-    #         LOGGER.info(
-    #             "Received an error message for a different simulation: '{:s}' instead of '{:s}'".format(
-    #                 message_object.simulation_id, self.simulation_id))
-    #     elif message_object.message_type != StatusMessage.CLASS_MESSAGE_TYPE:
-    #         LOGGER.warning(
-    #             "Received an error message with wrong message type: '{:s}' instead of '{:s}'".format(
-    #                 message_object.message_type, StatusMessage.CLASS_MESSAGE_TYPE))
-    #     elif message_object.value != SimulationManager.ERROR_STATUS:
-    #         LOGGER.warning("Received an error message with a wrong value: '{:s}' instead of '{:s}'".format(
-    #             message_object.value, SimulationManager.ERROR_STATUS))
-    #     else:
-    #         LOGGER.debug("Received an error message from {:s} with description '{:s}' at topic {:s}".format(
-    #             message_object.source_process_id, message_object.description, message_routing_key))
-    #         await self.stop()
-
     async def __send_epoch_message(self, new_epoch: bool = True):
         """Sends an epoch message to the message bus.
            If new_epoch is True or the first epoch has not been started yet, starts a new epoch.
