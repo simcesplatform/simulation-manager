@@ -36,7 +36,7 @@ class TestSimulationComponents(unittest.TestCase):
         self.assertEqual(components.get_component_list(), new_component_names)
         self.assertEqual(components.get_latest_full_epoch(), NO_MESSAGES)
         self.assertEqual(str(components), ", ".join([
-            "{:s} ({:d})".format(component_name, NO_MESSAGES)
+            "{:s} ({:d}, False)".format(component_name, NO_MESSAGES)
             for component_name in new_component_names
         ]))
 
@@ -51,7 +51,7 @@ class TestSimulationComponents(unittest.TestCase):
         self.assertEqual(components.get_component_list(), remaining_component_names)
         self.assertEqual(components.get_latest_full_epoch(), NO_MESSAGES)
         self.assertEqual(str(components), ", ".join([
-            "{:s} ({:d})".format(component_name, NO_MESSAGES)
+            "{:s} ({:d}, False)".format(component_name, NO_MESSAGES)
             for component_name in remaining_component_names
         ]))
 
@@ -87,18 +87,59 @@ class TestSimulationComponents(unittest.TestCase):
             components.add_component(component_name)
 
         for epoch_number, (component_names, full_epoch) in ready_messages.items():
-            for epoch_component_name in component_names:
-                components.register_ready_message(epoch_component_name, epoch_number, epoch_component_name)
+            with self.subTest(epoch_number=epoch_number):
+                for epoch_component_name in component_names:
+                    components.register_status_message(epoch_component_name, epoch_number, epoch_component_name)
 
-            self.assertEqual(components.get_latest_full_epoch(), full_epoch)
-            self.assertEqual(components.get_latest_status_message_ids(), ready_messages[epoch_number][0])
+                self.assertEqual(components.get_latest_full_epoch(), full_epoch)
+                self.assertEqual(components.get_latest_status_message_ids(), ready_messages[epoch_number][0])
 
-            for actual_component_name in new_component_names:
-                self.assertGreaterEqual(components.get_latest_epoch_for_component(actual_component_name), full_epoch)
-                if actual_component_name in component_names:
-                    self.assertEqual(components.get_latest_epoch_for_component(actual_component_name), epoch_number)
-                else:
-                    self.assertLess(components.get_latest_epoch_for_component(actual_component_name), epoch_number)
+                for actual_component_name in new_component_names:
+                    with self.subTest(component_name=actual_component_name):
+                        self.assertGreaterEqual(
+                            components.get_latest_epoch_for_component(actual_component_name), full_epoch)
+                        if actual_component_name in component_names:
+                            self.assertEqual(
+                                components.get_latest_epoch_for_component(actual_component_name), epoch_number)
+                        else:
+                            self.assertLess(
+                                components.get_latest_epoch_for_component(actual_component_name), epoch_number)
+
+                self.assertTrue(components.is_in_normal_state())
+
+        # test handling of status error messages
+        # The tuple format is (component_name_list, components_with_error).
+        status_messages = {
+            9: (new_component_names, ["generator"]),
+            10: (new_component_names, ["generator", "planner"]),
+            11: (new_component_names, ["planner"])
+        }
+
+        self.assertTrue(components.is_component_in_normal_state("generator"))
+        self.assertTrue(components.is_component_in_normal_state("planner"))
+        self.assertTrue(components.is_component_in_normal_state("logger"))
+
+        for epoch_number, (component_names, error_list) in status_messages.items():
+            with self.subTest(epoch_number=epoch_number):
+                for epoch_component_name in component_names:
+                    components.register_status_message(
+                        component_name=epoch_component_name,
+                        epoch_number=epoch_number,
+                        status_message_id=epoch_component_name,
+                        error_state=epoch_component_name in error_list)
+                self.assertFalse(components.is_in_normal_state())
+
+        # "generator" and "planner" should be in error state and the last "ready" message
+        #  should not have registered for "generator" because it was in an error state.
+        self.assertEqual(components.get_latest_epoch_for_component("generator"), 10)
+        self.assertEqual(components.get_latest_epoch_for_component("planner"), 11)
+        self.assertEqual(components.get_latest_epoch_for_component("logger"), 11)
+        self.assertFalse(components.is_component_in_normal_state("generator"))
+        self.assertFalse(components.is_component_in_normal_state("planner"))
+        self.assertTrue(components.is_component_in_normal_state("logger"))
+
+        self.assertIsNone(components.get_latest_epoch_for_component("unknown"))
+        self.assertIsNone(components.is_component_in_normal_state("unknown"))
 
 
 if __name__ == '__main__':

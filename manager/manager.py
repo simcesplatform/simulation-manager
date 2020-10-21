@@ -156,8 +156,12 @@ class SimulationManager:
 
         if self.get_simulation_state() == SimulationManager.SIMULATION_STATE_VALUE_RUNNING:
             if latest_full_epoch == self.__epoch_number:
-                # the current epoch is finished => send a new epoch message
-                await self.__send_epoch_message()
+                if self.__simulation_components.is_in_normal_state():
+                    # the current epoch is finished => send a new epoch message
+                    await self.__send_epoch_message()
+                else:
+                    LOGGER.error("Stopping the simulation because one of the components is in an error state.")
+                    await self.stop()
 
     async def send_state_message(self):
         """Sends a simulation state message."""
@@ -200,12 +204,18 @@ class SimulationManager:
                     message_object.source_process_id, ", ".join(message_object.warnings)))
 
             if message_object.value == SimulationManager.READY_STATUS:
-                self.__simulation_components.register_ready_message(
-                    message_object.source_process_id, message_object.epoch_number, message_object.message_id)
+                self.__simulation_components.register_status_message(
+                    message_object.source_process_id, message_object.epoch_number, message_object.message_id, False)
             elif message_object.value == SimulationManager.ERROR_STATUS:
                 LOGGER.debug("Received an error message from {:s} with description '{:s}' at topic {:s}".format(
                     message_object.source_process_id, message_object.description, message_routing_key))
-                await self.stop()
+                self.__simulation_components.register_status_message(
+                    message_object.source_process_id, message_object.epoch_number, message_object.message_id, True)
+                if self.__epoch_number >= 1:
+                    # Don't stop the simulation immediately if it is still in the initialization phase (epoch == 0)
+                    LOGGER.error("Stopping the simulation because one of the components is in an error state.")
+                    await self.stop()
+
             await self.check_components()
 
     async def __send_epoch_message(self, new_epoch: bool = True):
