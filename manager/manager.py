@@ -174,6 +174,7 @@ class SimulationManager:
             self.stop()
         else:
             await self.__rabbitmq_client.send_message(self.__state_topic, new_simulation_state_message)
+            await self.__start_epoch_timer()
 
     async def general_message_handler(self, message_object: Union[AbstractMessage, Any], message_routing_key: str):
         """Forwards the message handling to the appropriate function depending on the message type."""
