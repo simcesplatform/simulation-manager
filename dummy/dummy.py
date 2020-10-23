@@ -4,12 +4,12 @@
 
 import asyncio
 import random
-from typing import cast, Any, Union
+from typing import cast, Union
 
 from dummy.random_series import get_all_random_series, get_latest_values, get_random_initial_values
 from tools.components import AbstractSimulationComponent
 from tools.exceptions.timeseries import TimeSeriesError
-from tools.messages import AbstractMessage, EpochMessage, ResultMessage, StatusMessage, SimulationStateMessage
+from tools.messages import EpochMessage, ResultMessage, StatusMessage
 from tools.tools import FullLogger, load_environmental_variables
 
 LOGGER = FullLogger(__name__)
@@ -63,19 +63,9 @@ class DummyComponent(AbstractSimulationComponent):
         # Setup the first values of the randomly generated time series for the result messages.
         self._last_result_values = get_random_initial_values()
 
-    async def start_epoch(self) -> bool:
+    async def process_epoch(self) -> bool:
         """Starts a new epoch for the dummy component. Sends a status message when finished."""
-        abstract_start_epoch = await super().start_epoch()
-        if not abstract_start_epoch:
-            return False
-
         # At this point the simulation should be running and dummy ready to start the epoch.
-
-        # If the epoch is already completed, send a new status message immediately.
-        if self._completed_epoch == self._latest_epoch:
-            LOGGER.debug("Resending status message for epoch {:d}".format(self._latest_epoch))
-            # The send_status_message call is in the epoch_message_handler.
-            return True
 
         # Simulate an error possibility by using the random error chanche setting.
         rand_error_chance = random.random()
@@ -91,16 +81,8 @@ class DummyComponent(AbstractSimulationComponent):
         await asyncio.sleep(rand_wait_time)
 
         await self._send_random_result_message()
-        # The send_status_message call is in the epoch_message_handler.
+        # The send_status_message call is in the start_epoch in AbstractSimulationComponent.
         return True
-
-    async def general_message_handler(self, message_object: Union[AbstractMessage, Any], message_routing_key: str):
-        """Forwards the message handling to the appropriate function depending on the message type."""
-        await super().general_message_handler(message_object, message_routing_key)
-
-        if not isinstance(message_object, (SimulationStateMessage, EpochMessage)):
-            LOGGER.warning("Received '{:s}' message when expecting for '{:s}' or '{:s}' message".format(
-                str(type(message_object)), str(SimulationStateMessage), str(EpochMessage)))
 
     async def epoch_message_handler(self, message_object: EpochMessage, message_routing_key: str) -> None:
         """Handles the received epoch messages."""
