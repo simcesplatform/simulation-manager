@@ -107,7 +107,7 @@ class SimulationManager:
         LOGGER.info("Stopping the simulation.")
         await self.__stop_epoch_timer()
         self.__simulation_state = SimulationManager.SIMULATION_STATE_VALUE_STOPPED
-        await self.send_state_message()
+        await self.send_state_message(start_timer=False)
         await self.__rabbitmq_client.close()
         self.__is_stopped = True
 
@@ -145,10 +145,7 @@ class SimulationManager:
             if new_simulation_state == SimulationManager.SIMULATION_STATE_VALUE_RUNNING:
                 await self.send_state_message()
             elif new_simulation_state == SimulationManager.SIMULATION_STATE_VALUE_STOPPED:
-                # LOGGER.info("Simulation manager '{:s}' stopping in {:d} seconds.".format(
-                #     self.__manager_name, TIMEOUT_INTERVAL))
-                # await asyncio.sleep(TIMEOUT_INTERVAL)
-                self.stop()
+                await self.stop()
 
     async def check_components(self):
         """Checks the status of the simulation components and sends a new epoch message if needed."""
@@ -163,7 +160,7 @@ class SimulationManager:
                     LOGGER.error("Stopping the simulation because one of the components is in an error state.")
                     await self.stop()
 
-    async def send_state_message(self):
+    async def send_state_message(self, start_timer: bool = True):
         """Sends a simulation state message."""
         LOGGER.debug("Sending state message: '{:s}'".format(self.get_simulation_state()))
 
@@ -171,10 +168,11 @@ class SimulationManager:
         if new_simulation_state_message is None:
             # So serious error that even the simulation state message could not be created => stop the manager.
             LOGGER.error("Simulation manager exiting due to internal error")
-            self.stop()
+            await self.stop()
         else:
             await self.__rabbitmq_client.send_message(self.__state_topic, new_simulation_state_message)
-            await self.__start_epoch_timer()
+            if start_timer:
+                await self.__start_epoch_timer()
 
     async def general_message_handler(self, message_object: Union[AbstractMessage, Any], message_routing_key: str):
         """Forwards the message handling to the appropriate function depending on the message type."""
