@@ -6,8 +6,8 @@ import random
 from typing import Dict, List, Union
 
 from tools.datetime_tools import to_utc_datetime_object
-from tools.exceptions.timeseries import TimeSeriesError
-from tools.timeseries import TimeSeriesAttribute, TimeSeriesBlock
+from tools.exceptions.messages import MessageError
+from tools.messages import ValueArrayBlock, TimeSeriesBlock
 from tools.tools import FullLogger
 
 LOGGER = FullLogger(__name__)
@@ -96,7 +96,7 @@ def get_random_time_series(random_attribute_name: str, start_values: Dict[str, f
             max_difference=random_attribute_definition["max_difference"])
         start_values[sub_attribute] = new_random_series[-1]
 
-        random_series_collection[sub_attribute] = TimeSeriesAttribute.from_json({
+        random_series_collection[sub_attribute] = ValueArrayBlock.from_json({
             "UnitOfMeasure": random_attribute_definition["unit"],
             "Values": new_random_series
         })
@@ -138,7 +138,7 @@ def get_latest_values(random_series_collection: Dict[str, Union[float, TimeSerie
        Raises TimeseriesError if not all attributes are included in the given random_series_collection."""
     for random_attribute in RANDOM_ATTRIBUTES:
         if random_attribute not in random_series_collection:
-            raise TimeSeriesError("Missing attribute: {:s}".format(random_attribute))
+            raise MessageError("Missing attribute: {:s}".format(random_attribute))
 
     latest_values = {}
     for attribute_name, attribute_values in random_series_collection.items():

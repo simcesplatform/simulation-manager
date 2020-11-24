@@ -8,7 +8,7 @@ from typing import cast, Union
 
 from dummy.random_series import get_all_random_series, get_latest_values, get_random_initial_values
 from tools.components import AbstractSimulationComponent
-from tools.exceptions.timeseries import TimeSeriesError
+from tools.exceptions.messages import MessageError
 from tools.messages import EpochMessage, ResultMessage, StatusMessage
 from tools.tools import FullLogger, load_environmental_variables
 
@@ -143,7 +143,7 @@ class DummyComponent(AbstractSimulationComponent):
                 self._last_result_values, self._latest_epoch_message.start_time, self._latest_epoch_message.end_time)
             self._last_result_values = get_latest_values(new_random_series_collection)
             result_message.result_values = new_random_series_collection
-        except TimeSeriesError:
+        except MessageError:
             LOGGER.error("Error when creating values for result message")
             return None
 
