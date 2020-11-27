@@ -15,8 +15,6 @@ services:
       - RABBITMQ_SSL=false
       - RABBITMQ_EXCHANGE=procem.simulation_manager_exchange
       - SIMULATION_LOG_LEVEL=50
-      - SIMULATION_ID=2010-12-31T23:59:59.999Z
-      - SIMULATION_COMPONENT_NAME=test_dummy
     networks:
       - manager_test_network
 

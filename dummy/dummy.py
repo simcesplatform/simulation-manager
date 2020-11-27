@@ -32,13 +32,13 @@ WARNING_CHANCE = "WARNING_CHANCE"
 class DummyComponent(AbstractSimulationComponent):
     """Class for holding the state of a dummy simulation component."""
 
-    def __init__(self):
+    def __init__(self, **kwargs):
         """Loads the parameters required by the dummy component from environmental variables and sets up
            the connection to the RabbitMQ message bus for which the connection parameters are also
            fetched from environmental variables. Opens a topic listener for the simulation state and epoch messages
            after creating the connection to the message bus.
         """
-        super().__init__()  # call the AbstractSimulationComponent constructor
+        super().__init__(**kwargs)  # call the AbstractSimulationComponent constructor
 
         # Load the dummy component specific environmental variables.
         env_variables = load_environmental_variables(

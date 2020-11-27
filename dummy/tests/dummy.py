@@ -66,19 +66,25 @@ class MessageGeneratorExtended(MessageGenerator):
         return result_message
 
 
-def dummy_component_creator(message: str) -> DummyComponent:
+def dummy_component_creator(message: str, **kwargs) -> DummyComponent:
     """An example of using a creator function with Test class. Returns a new Dummy component."""
     if message.lower() == "hello":
         # NOTE: the default log level setting for running the unit tests is critical only
         LOGGER.info("Hello from component_creator!")
-    return DummyComponent()
+    return DummyComponent(**kwargs)
 
 
 # Use TestAbstractSimulationComponent as a base class to define the unit tests.
 class TestDummyComponent(TestAbstractSimulationComponent):
     """Unit tests for sending and receiving messages using DummyComponent object."""
+    component_name = "TestDummy"
+
     component_creator = dummy_component_creator
-    component_creator_params = {"message": "hello"}
+    component_creator_params = {
+        "simulation_id": TestAbstractSimulationComponent.simulation_id,
+        "component_name": component_name,
+        "message": "hello"
+    }
     message_generator_type = MessageGeneratorExtended
     normal_simulation_epochs = 12
     short_wait = 0.5
