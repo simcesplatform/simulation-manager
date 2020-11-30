@@ -4,13 +4,13 @@
 
 import asyncio
 import datetime
-from typing import cast, Any, Union
+from typing import Optional, cast, Any, Union
 
 from manager.components import SimulationComponents
 from tools.clients import RabbitmqClient
 from tools.datetime_tools import to_utc_datetime_object
-from tools.messages import AbstractMessage, EpochMessage, StatusMessage, SimulationStateMessage, \
-                           get_next_message_id
+from tools.exceptions.messages import MessageError
+from tools.messages import BaseMessage, StatusMessage, SimulationStateMessage, MessageGenerator
 from tools.timer import Timer
 from tools.tools import FullLogger, load_environmental_variables
 
@@ -82,7 +82,7 @@ class SimulationManager:
         self.__status_topic = status_topic
         self.__error_topic = error_topic
 
-        self.__message_id_generator = get_next_message_id(self.manager_name)
+        self.__message_generator = MessageGenerator(self.__simulation_id, self.__manager_name)
 
         self.__rabbitmq_client.add_listener(
             [
@@ -174,7 +174,7 @@ class SimulationManager:
             if start_timer:
                 await self.__start_epoch_timer()
 
-    async def general_message_handler(self, message_object: Union[AbstractMessage, Any], message_routing_key: str):
+    async def general_message_handler(self, message_object: Union[BaseMessage, Any], message_routing_key: str):
         """Forwards the message handling to the appropriate function depending on the message type."""
         if isinstance(message_object, StatusMessage):
             await self.status_message_handler(message_object, message_routing_key)
@@ -248,39 +248,33 @@ class SimulationManager:
         else:
             await self.stop()
 
-    def __get_simulation_state_message(self) -> Union[bytes, None]:
+    def __get_simulation_state_message(self) -> Optional[bytes]:
         """Creates a new simulation state message and returns it in bytes format.
            If there is a problem creating the message, returns None."""
-        state_message = SimulationStateMessage.from_json({
-            "Type": SimulationStateMessage.CLASS_MESSAGE_TYPE,
-            "SimulationId": self.simulation_id,
-            "SourceProcessId": self.manager_name,
-            "MessageId": next(self.__message_id_generator),
-            "SimulationState": self.get_simulation_state(),
-            "Name": self.__simulation_name,
-            "Description": self.__simulation_description
-        })
-        if state_message is None:
-            LOGGER.error("Problem with creating a simulation state message")
+        try:
+            state_message = self.__message_generator.get_simulation_state_message(
+                SimulationState=self.get_simulation_state(),
+                Name=self.__simulation_name,
+                Description=self.__simulation_description
+            )
+        except (MessageError, ValueError, TypeError) as message_error:
+            LOGGER.error("Problem with creating a simulation state message: {}".format(message_error))
             return None
 
         return state_message.bytes()
 
-    def __get_epoch_message(self) -> Union[bytes, None]:
+    def __get_epoch_message(self) -> Optional[bytes]:
         """Creates a new epoch message and returns it in bytes format.
            If there is a problem creating the message, returns None."""
-        epoch_message = EpochMessage.from_json({
-            "Type": EpochMessage.CLASS_MESSAGE_TYPE,
-            "SimulationId": self.simulation_id,
-            "SourceProcessId": self.manager_name,
-            "MessageId": next(self.__message_id_generator),
-            "EpochNumber": self.epoch_number,
-            "TriggeringMessageIds": self.__simulation_components.get_latest_status_message_ids(),
-            "StartTime": self.__current_start_time,
-            "EndTime": self.__current_end_time
-        })
-        if epoch_message is None:
-            LOGGER.error("Problem with creating a epoch message")
+        try:
+            epoch_message = self.__message_generator.get_epoch_message(
+                EpochNumber=self.epoch_number,
+                TriggeringMessageIds=self.__simulation_components.get_latest_status_message_ids(),
+                StartTime=self.__current_start_time,
+                EndTime=self.__current_end_time  # type: ignore
+            )
+        except (MessageError, ValueError, TypeError) as message_error:
+            LOGGER.error("Problem with creating a epoch message: {}".format(message_error))
             return None
 
         return epoch_message.bytes()
