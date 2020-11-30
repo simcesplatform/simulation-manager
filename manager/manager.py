@@ -52,6 +52,7 @@ class SimulationManager:
                  simulation_components: str, initial_start_time: str, epoch_length: int, max_epochs: int,
                  epoch_timer_interval: float, max_epoch_resends: int,
                  epoch_topic: str, state_topic: str, status_topic: str, error_topic: str):
+        # TODO: add some argument value checks here
         self.__rabbitmq_client = RabbitmqClient()
         self.__simulation_id = simulation_id
         self.__manager_name = manager_name
@@ -160,15 +161,19 @@ class SimulationManager:
                     LOGGER.error("Stopping the simulation because one of the components is in an error state.")
                     await self.stop()
 
-    async def send_state_message(self, start_timer: bool = True):
+    async def send_state_message(self, start_timer: bool = True, stop_with_error: bool = True):
         """Sends a simulation state message."""
-        LOGGER.debug("Sending state message: '{:s}'".format(self.get_simulation_state()))
+        LOGGER.debug("Sending simulation state message: '{:s}'".format(self.get_simulation_state()))
 
         new_simulation_state_message = self.__get_simulation_state_message()
         if new_simulation_state_message is None:
-            # So serious error that even the simulation state message could not be created => stop the manager.
-            LOGGER.error("Simulation manager exiting due to internal error")
-            await self.stop()
+            if stop_with_error:
+                # So serious error that even the simulation state message could not be created => stop the manager.
+                LOGGER.error("Simulation manager exiting due to internal error")
+                await self.stop()
+            else:
+                # Simulation state message could not be created but do not call stop() to avoid infinite loop.
+                LOGGER.error("Could not create the simulation state message")
         else:
             await self.__rabbitmq_client.send_message(self.__state_topic, new_simulation_state_message)
             if start_timer:
