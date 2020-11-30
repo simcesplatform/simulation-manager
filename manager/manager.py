@@ -108,7 +108,7 @@ class SimulationManager:
         LOGGER.info("Stopping the simulation.")
         await self.__stop_epoch_timer()
         self.__simulation_state = SimulationManager.SIMULATION_STATE_VALUE_STOPPED
-        await self.send_state_message(start_timer=False)
+        await self.send_state_message(start_timer=False, stop_with_error=False)
         await self.__rabbitmq_client.close()
         self.__is_stopped = True
 
