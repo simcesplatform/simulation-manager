@@ -100,8 +100,8 @@ class SimulationManager:
     async def start(self):
         """Starts the simulation. Sends a simulation state message."""
         LOGGER.info("Starting the simulation.")
-        await self.set_simulation_state(SimulationManager.SIMULATION_STATE_VALUE_RUNNING)
         self.__is_stopped = False
+        await self.set_simulation_state(SimulationManager.SIMULATION_STATE_VALUE_RUNNING)
 
     async def stop(self):
         """Stops the simulation. Sends a simulation state message to the message bus."""
@@ -262,8 +262,11 @@ class SimulationManager:
                 Name=self.__simulation_name,
                 Description=self.__simulation_description
             )
-        except (MessageError, ValueError, TypeError) as message_error:
-            LOGGER.error("Problem with creating a simulation state message: {}".format(message_error))
+        except (MessageError, ValueError, TypeError, StopIteration) as message_error:
+            exception_message = getattr(message_error, "message", None)
+            if exception_message is None:
+                exception_message = str(type(message_error))
+            LOGGER.error("Problem with creating a simulation state message: {}".format(exception_message))
             return None
 
         return state_message.bytes()
