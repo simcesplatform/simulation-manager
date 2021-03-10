@@ -6,13 +6,14 @@ import asyncio
 import datetime
 from typing import Optional, cast, Any, Union
 
-from manager.components import SimulationComponents
 from tools.clients import RabbitmqClient
 from tools.datetime_tools import to_utc_datetime_object
 from tools.exceptions.messages import MessageError
 from tools.messages import BaseMessage, StatusMessage, SimulationStateMessage, MessageGenerator
 from tools.timer import Timer
 from tools.tools import FullLogger, load_environmental_variables
+
+from manager.components import SimulationComponents
 
 LOGGER = FullLogger(__name__)
 
@@ -62,7 +63,8 @@ class SimulationManager:
 
         self.__simulation_components = SimulationComponents()
         for component_name in cast(str, simulation_components.split(",")):
-            self.__simulation_components.add_component(component_name)
+            if component_name:
+                self.__simulation_components.add_component(component_name)
 
         self.__simulation_state = SimulationManager.SIMULATION_STATE_VALUE_STOPPED
         self.__epoch_number = 0
@@ -101,7 +103,12 @@ class SimulationManager:
         """Starts the simulation. Sends a simulation state message."""
         LOGGER.info("Starting the simulation.")
         self.__is_stopped = False
-        await self.set_simulation_state(SimulationManager.SIMULATION_STATE_VALUE_RUNNING)
+
+        if self.__simulation_components.get_component_list():
+            await self.set_simulation_state(SimulationManager.SIMULATION_STATE_VALUE_RUNNING)
+        else:
+            LOGGER.warning("No components in the simulation. Stopping the simulation.")
+            await self.stop()
 
     async def stop(self):
         """Stops the simulation. Sends a simulation state message to the message bus."""
