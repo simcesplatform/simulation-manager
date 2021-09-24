@@ -1,4 +1,5 @@
 FROM python:3.7.9
+LABEL org.opencontainers.image.source https://github.com/simcesplatform/simulation-manager/Dockerfile-manager
 
 RUN mkdir -p /init
 RUN mkdir -p /manager
