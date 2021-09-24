@@ -35,7 +35,7 @@ The simulation manager handles the starting and ending of the simulation, [Simul
     - [listener](listener)
         - A simple message bus listener component for testing purposes. The basis of the listener part for the LogWriter.
     - [simulation-tools](tools)
-        - The helper library [simulation-tools](https://git.ain.rd.tut.fi/procemplus/simulation-tools) as a Git submodule. See [README.md](https://git.ain.rd.tut.fi/procemplus/simulation-tools/-/blob/master/README.md) for information about the contents of the helper library.
+        - The helper library [simulation-tools](https://github.com/simcesplatform/simulation-tools) as a Git submodule. See [README.md](https://github.com/simcesplatform/simulation-tools/blob/master/README.md) for information about the contents of the helper library.
     - [init](init)
         - Init file that adds the submodule simulation-tools to the python path to allow the other code easy access to the tools library.
     - [env](env)
@@ -43,13 +43,11 @@ The simulation manager handles the starting and ending of the simulation, [Simul
     - [docker_tests](docket_tests)
         - docker-compose file for the unit tests.
     - [docker-files](docker-files)
-        - Combined docker-compose file to run a test simulation with the [LogReader](https://git.ain.rd.tut.fi/procemplus/logreader) and the [LogWriter](https://git.ain.rd.tut.fi/procemplus/logwriter).
+        - Combined docker-compose file to run a test simulation with the [LogReader](https://github.com/simcesplatform/logreader) and the [LogWriter](https://github.com/simcesplatform/logwriter).
     - [rabbitmq](rabbitmq)
         - docker-compose file for setting up a local RabbitMQ server.
     - [logs](logs)
         - Script to help copy the log files produced by the Docker components to a local folder.
-    - [legacy](legacy)
-        - Legacy code that is not in use anymore but is still preserved for some reason.
 
 ## Cloning the repository
 
