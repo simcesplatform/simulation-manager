@@ -1,4 +1,8 @@
 # -*- coding: utf-8 -*-
+# Copyright 2021 Tampere University and VTT Technical Research Centre of Finland
+# This software was developed as a part of the ProCemPlus project: https://www.senecc.fi/projects/procemplus
+# This source code is licensed under the MIT license. See LICENSE in the repository root directory.
+# Author(s): Ville Heikkilä <ville.heikkila@tuni.fi>
 
 """Unit test for the components module."""
 
@@ -64,7 +68,7 @@ class TestSimulationComponents(unittest.TestCase):
         """Tests the latest epoch calculations."""
         new_component_names = ["generator", "planner", "logger", "extra", "watcher"]
         component_names_expect_first = new_component_names[1:]
-        component_names_expect_last = new_component_names[:len(new_component_names)-1]
+        component_names_expect_last = new_component_names[:len(new_component_names) - 1]
         component_names_expect_middle = new_component_names[:len(new_component_names) // 2] + \
             new_component_names[len(new_component_names) // 2 + 1:]
 

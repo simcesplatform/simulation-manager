@@ -1,4 +1,8 @@
 # -*- coding: utf-8 -*-
+# Copyright 2021 Tampere University and VTT Technical Research Centre of Finland
+# This software was developed as a part of the ProCemPlus project: https://www.senecc.fi/projects/procemplus
+# This source code is licensed under the MIT license. See LICENSE in the repository root directory.
+# Author(s): Ville Heikkilä <ville.heikkila@tuni.fi>
 
 """This module contains the main Simulation Manager code for the Simulation platform."""
 
@@ -203,9 +207,6 @@ class SimulationManager:
         elif message_object.message_type != StatusMessage.CLASS_MESSAGE_TYPE:
             LOGGER.warning("Received a status message with wrong message type: '{:s}' instead of '{:s}'".format(
                 message_object.message_type, StatusMessage.CLASS_MESSAGE_TYPE))
-        # elif message_object.value != SimulationManager.READY_STATUS:
-        #     LOGGER.warning("Received a status message with an unknown value: '{:s}' instead of '{:s}'".format(
-        #         message_object.value, SimulationManager.READY_STATUS))
         elif message_object.source_process_id != self.__manager_name:
             LOGGER.debug("Received a status message from {:s} at topic {:s}".format(
                 message_object.source_process_id, message_routing_key))

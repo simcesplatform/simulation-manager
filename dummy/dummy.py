@@ -1,4 +1,8 @@
 # -*- coding: utf-8 -*-
+# Copyright 2021 Tampere University and VTT Technical Research Centre of Finland
+# This software was developed as a part of the ProCemPlus project: https://www.senecc.fi/projects/procemplus
+# This source code is licensed under the MIT license. See LICENSE in the repository root directory.
+# Author(s): Ville Heikkilä <ville.heikkila@tuni.fi>
 
 """This module contains a dummy simulation component that has very simple internal logic."""
 
@@ -6,11 +10,12 @@ import asyncio
 import random
 from typing import cast, Union
 
-from dummy.random_series import get_all_random_series, get_latest_values, get_random_initial_values
 from tools.components import AbstractSimulationComponent
 from tools.exceptions.messages import MessageError
 from tools.messages import EpochMessage, ResultMessage, StatusMessage
 from tools.tools import FullLogger, load_environmental_variables
+
+from dummy.random_series import get_all_random_series, get_latest_values, get_random_initial_values
 
 LOGGER = FullLogger(__name__)
 
@@ -139,6 +144,10 @@ class DummyComponent(AbstractSimulationComponent):
             return None
 
         try:
+            if self._latest_epoch_message is None:
+                LOGGER.error("No epoch message found when trying to create result message")
+                return None
+
             new_random_series_collection = get_all_random_series(
                 self._last_result_values, self._latest_epoch_message.start_time, self._latest_epoch_message.end_time)
             self._last_result_values = get_latest_values(new_random_series_collection)

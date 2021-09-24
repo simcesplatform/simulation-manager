@@ -7,9 +7,6 @@
             ]
         }
     ],
-    "ignore": [
-        "legacy"
-    ],
     "typeCheckingMode": "basic",
     "reportPropertyTypeMismatch": "none"
 }

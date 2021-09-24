@@ -1,17 +1,22 @@
 # -*- coding: utf-8 -*-
+# Copyright 2021 Tampere University and VTT Technical Research Centre of Finland
+# This software was developed as a part of the ProCemPlus project: https://www.senecc.fi/projects/procemplus
+# This source code is licensed under the MIT license. See LICENSE in the repository root directory.
+# Author(s): Ville Heikkilä <ville.heikkila@tuni.fi>
 
 """Unit test module for the AbstractSimulationComponent class."""
 
 import os
 from typing import Any, List, Tuple, cast
 
-from dummy.dummy import DummyComponent
-from dummy.random_series import get_all_random_series, get_latest_values, get_random_initial_values
 from tools.messages import AbstractMessage, ResultMessage
 # Importing TestAbstractSimulationComponent means that also those unit tests
 # will be run when running the unit test in this repository.
 from tools.tests.components import MessageGenerator, TestAbstractSimulationComponent
 from tools.tools import FullLogger
+
+from dummy.dummy import DummyComponent
+from dummy.random_series import get_all_random_series, get_latest_values, get_random_initial_values
 
 LOGGER = FullLogger(__name__)
 
