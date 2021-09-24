@@ -1,4 +1,6 @@
 FROM nikolaik/python-nodejs:python3.7-nodejs12
+LABEL org.opencontainers.image.source https://github.com/simcesplatform/simulation-manager
+LABEL org.opencontainers.image.description "Docker image for the dummy component. Docker image source: Dockerfile-dummy"
 
 RUN mkdir -p /dummy
 RUN mkdir -p /init
