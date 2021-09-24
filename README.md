@@ -54,7 +54,7 @@ The simulation manager handles the starting and ending of the simulation, [Simul
 ## Cloning the repository
 
 ```bash
-git -c http.sslVerify=false clone --recursive https://git.ain.rd.tut.fi/procemplus/simulation-manager.git
+git clone --recursive https://github.com/simcesplatform/simulation-manager.git
 ```
 
 ## Pulling changes to previously cloned repository
@@ -62,14 +62,14 @@ git -c http.sslVerify=false clone --recursive https://git.ain.rd.tut.fi/procempl
 Cloning the submodules for repository that does not yet have them:
 
 ```bash
-git -c http.sslVerify=false submodule update --init --recursive
+git submodule update --init --recursive
 ```
 
 Pulling changes to both this repository and all the submodules:
 
 ```bash
-git -c http.sslVerify=false pull --recurse-submodules
-git -c http.sslVerify=false submodule update --remote
+git pull --recurse-submodules
+git submodule update --remote
 ```
 
 To prevent any local changes made to the configuration files containing usernames or passwords showing with `git status`:
