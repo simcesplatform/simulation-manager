@@ -2,8 +2,8 @@
 
 Name: Dummy
 Type: platform
-Description: "Dummy component for the Decoupled Simulation Platform"
-DockerImage: procem.ain.rd.tut.fi/despa/dummy
+Description: "Dummy component for the SimCES simulation platform"
+DockerImage: ghcr.io/simcesplatform/dummy-component:latest
 Attributes:
     MinSleepTime:
         Environment: MIN_SLEEP_TIME

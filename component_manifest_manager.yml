@@ -2,8 +2,8 @@
 
 Name: SimulationManager
 Type: platform
-DockerImage: procem.ain.rd.tut.fi/despa/simulation_manager
-Description: "Simulation Manager for the Decoupled Simulation Platform"
+DockerImage: ghcr.io/simcesplatform/simulation_manager:latest
+Description: "Simulation Manager for the SimCES simulation platform"
 Attributes:
     InitialStartTime:
         Optional: false
