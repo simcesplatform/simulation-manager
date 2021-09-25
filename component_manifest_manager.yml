@@ -2,7 +2,7 @@
 
 Name: SimulationManager
 Type: platform
-DockerImage: ghcr.io/simcesplatform/simulation_manager:latest
+DockerImage: ghcr.io/simcesplatform/simulation-manager:latest
 Description: "Simulation Manager for the SimCES simulation platform"
 Attributes:
     InitialStartTime:
