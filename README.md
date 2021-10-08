@@ -1,7 +1,7 @@
 # Simulation Manager
 
 Implementation of the simulation manager component as well as dummy components for the simulation platform.
-The simulation manager handles the starting and ending of the simulation, [Simulation Manager](https://wiki.eduuni.fi/display/tuniSimCES/Simulation+Manager), and starting simulation epochs when all simulation components are ready for a new epoch, [Omega](https://wiki.eduuni.fi/display/tuniSimCES/Omega).
+The simulation manager handles the starting and ending of the simulation and starting simulation epochs when all simulation components are ready for a new epoch, see: [Simulation Manager](https://github.com/simcesplatform/core_simulationmanager).
 
 ## Contents of the repository
 
@@ -43,7 +43,7 @@ The simulation manager handles the starting and ending of the simulation, [Simul
     - [docker_tests](docket_tests)
         - docker-compose file for the unit tests.
     - [docker-files](docker-files)
-        - Combined docker-compose file to run a test simulation with the [LogReader](https://github.com/simcesplatform/logreader) and the [LogWriter](https://github.com/simcesplatform/logwriter).
+        - Combined docker-compose file to run a test simulation with the LogReader and the [LogWriter](https://github.com/simcesplatform/core_logwriter/).
     - [rabbitmq](rabbitmq)
         - docker-compose file for setting up a local RabbitMQ server.
     - [logs](logs)
