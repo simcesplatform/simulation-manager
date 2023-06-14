@@ -57,7 +57,7 @@ services:
       - mongodb_network_full
 
   log_writer:
-    image: log_writer:1.0.3
+    image: log_writer:1.0.4
     build:
       context: logwriter
       dockerfile: Dockerfile-log-writer
@@ -79,7 +79,7 @@ services:
       - rabbitmq_network_full
 
   simulation_manager:
-    image: simulation_manager:1.0.3
+    image: simulation_manager:1.0.4
     build:
       context: simulation-manager
       dockerfile: Dockerfile-manager
@@ -98,7 +98,7 @@ services:
       - rabbitmq_network_full
 
   dummy_1:
-    image: dummy:1.0.3
+    image: dummy:1.0.4
     build:
       context: simulation-manager
       dockerfile: Dockerfile-dummy
@@ -119,7 +119,7 @@ services:
       - rabbitmq_network_full
 
   dummy_2:
-    image: dummy:1.0.3
+    image: dummy:1.0.4
     build:
       context: simulation-manager
       dockerfile: Dockerfile-dummy
@@ -140,7 +140,7 @@ services:
       - rabbitmq_network_full
 
   dummy_3:
-    image: dummy:1.0.3
+    image: dummy:1.0.4
     build:
       context: simulation-manager
       dockerfile: Dockerfile-dummy
@@ -161,7 +161,7 @@ services:
       - rabbitmq_network_full
 
   dummy_4:
-    image: dummy:1.0.3
+    image: dummy:1.0.4
     build:
       context: simulation-manager
       dockerfile: Dockerfile-dummy
@@ -182,7 +182,7 @@ services:
       - rabbitmq_network_full
 
   dummy_5:
-    image: dummy:1.0.3
+    image: dummy:1.0.4
     build:
       context: simulation-manager
       dockerfile: Dockerfile-dummy
